@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: tacticae
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/tacticae}
+    username: ${DATABASE_USER:tacticae}
+    password: ${DATABASE_PASSWORD:tacticae}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
