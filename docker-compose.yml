@@ -15,5 +15,17 @@ services:
       timeout: 5s
       retries: 5
 
+  app:
+    image: tacticae:dev
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/tacticae
+      DATABASE_USER: tacticae
+      DATABASE_PASSWORD: tacticae
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres-data:
