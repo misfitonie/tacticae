@@ -17,26 +17,49 @@ public final class MonteCarloSimulator {
 
         for (int t = 0; t < trials; t++) {
             int totalHits = 0;
+            int autoWounds = 0;
             for (int a = 0; a < ctx.attacks(); a++) {
                 int roll = rng.nextInt(6) + 1;
-                if (roll == 1) continue;
+                if (roll == 1) {
+                    continue;
+                }
                 if (roll >= ctx.critThreshold()) {
-                    totalHits += 1 + ctx.sustainedHits();
+                    if (ctx.hasLethalHits()) {
+                        autoWounds++; // crit → auto-wound, skips wound roll
+                    } else {
+                        totalHits++;
+                    }
+                    totalHits += ctx.sustainedHitsValue(); // extra hits always roll to wound
                 } else if (roll >= ctx.hitOn()) {
                     totalHits += 1;
                 }
             }
 
-            int totalWounds = 0;
+            int normalWounds = autoWounds;
+            int critWounds = 0;
+            int effectiveWoundOn = ctx.effectiveWoundOn();
             for (int h = 0; h < totalHits; h++) {
                 int roll = rng.nextInt(6) + 1;
-                if (roll >= ctx.woundOn()) totalWounds++;
+                if (ctx.hasDevastatingWounds() && roll >= ctx.critThreshold()) {
+                    critWounds++;
+                } else if (roll >= effectiveWoundOn) {
+                    normalWounds++;
+                } else if (ctx.hasTwinLinked()) {
+                    int reroll = rng.nextInt(6) + 1;
+                    if (ctx.hasDevastatingWounds() && reroll >= ctx.critThreshold()) {
+                        critWounds++;
+                    } else if (reroll >= effectiveWoundOn) {
+                        normalWounds++;
+                    }
+                }
             }
 
-            int unsaved = 0;
-            for (int w = 0; w < totalWounds; w++) {
+            int unsaved = critWounds; // crit wounds bypass save
+            for (int w = 0; w < normalWounds; w++) {
                 int roll = rng.nextInt(6) + 1;
-                if (roll < ctx.saveOn()) unsaved++;
+                if (roll < ctx.saveOn()) {
+                    unsaved++;
+                }
             }
 
             counts.merge(unsaved * ctx.damage(), 1, Integer::sum);
