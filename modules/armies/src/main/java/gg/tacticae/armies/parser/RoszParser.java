@@ -43,18 +43,27 @@ public final class RoszParser {
         return new ArmyList(rosterName, factionName, List.copyOf(units));
     }
 
-    // Recursively finds selections that have a "Unit" profile.
-    // Stops recursing once a unit is found (its child selections are weapons).
+    // -------------------------------------------------------------------------
+    // Unit detection
+    // -------------------------------------------------------------------------
+
     private List<ParsedUnit> findUnits(Element sel) {
+        // Case 1 : profile Unit directement sur cette sélection
         Map<String, String> unitChars = profileChars(sel, "Unit");
         if (unitChars != null) {
-            String name = sel.getAttribute("name");
-            int count = intAttr(sel, "number", 1);
-            int t  = parseint(unitChars.get("T"), 4);
-            int w  = parseint(unitChars.get("W"), 1);
-            int sv = threshold(unitChars.get("Sv"), 7);
-            return List.of(new ParsedUnit(name, count, t, w, sv, List.copyOf(findWeapons(sel))));
+            return List.of(buildUnit(sel.getAttribute("name"), intAttr(sel, "number", 1), unitChars, sel));
         }
+
+        // Case 2 : sélection type="unit" dont le profil Unit est sur un modèle imbriqué
+        // (pattern BattleScribe/NewRecruit pour les unités multi-modèles)
+        if ("unit".equals(sel.getAttribute("type"))) {
+            Map<String, String> childChars = findFirstUnitChars(sel);
+            if (childChars != null) {
+                return List.of(buildUnit(sel.getAttribute("name"), intAttr(sel, "number", 1), childChars, sel));
+            }
+        }
+
+        // Case 3 : pas une unité à ce niveau, on descend
         List<ParsedUnit> units = new ArrayList<>();
         Element inner = child(sel, "selections");
         if (inner != null) {
@@ -65,17 +74,45 @@ public final class RoszParser {
         return units;
     }
 
-    // Finds weapon selections within a unit selection (recursive to handle nested upgrades).
+    private ParsedUnit buildUnit(String name, int count, Map<String, String> chars, Element sel) {
+        int t  = parseint(chars.get("T"), 4);
+        int w  = parseint(chars.get("W"), 1);
+        int sv = threshold(chars.get("SV"), 7);  // BSData uses "SV" (caps)
+        return new ParsedUnit(name, count, t, w, sv, List.copyOf(findWeapons(sel)));
+    }
+
+    /** Cherche en profondeur le premier profil Unit d'une sélection. */
+    private Map<String, String> findFirstUnitChars(Element sel) {
+        Map<String, String> chars = profileChars(sel, "Unit");
+        if (chars != null) return chars;
+
+        Element inner = child(sel, "selections");
+        if (inner != null) {
+            for (Element c : children(inner, "selection")) {
+                Map<String, String> found = findFirstUnitChars(c);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Weapon detection
+    // -------------------------------------------------------------------------
+
+    /** Collecte les armes dans une sélection et ses descendants non-unités. */
     private List<ParsedWeapon> findWeapons(Element sel) {
         List<ParsedWeapon> weapons = new ArrayList<>();
         Element inner = child(sel, "selections");
         if (inner == null) return weapons;
+
         for (Element c : children(inner, "selection")) {
             Map<String, String> chars = profileChars(c, "Ranged Weapons");
             if (chars == null) chars = profileChars(c, "Melee Weapons");
             if (chars != null) {
                 weapons.add(buildWeapon(c, chars));
             } else {
+                // Pas une arme : descendre (modèles imbriqués, upgrades sans profil d'arme)
                 weapons.addAll(findWeapons(c));
             }
         }
@@ -83,20 +120,28 @@ public final class RoszParser {
     }
 
     private ParsedWeapon buildWeapon(Element sel, Map<String, String> chars) {
-        String bs = chars.get("BS") != null ? chars.get("BS") : chars.get("WS");
+        String bsKey = chars.containsKey("BS") ? "BS" : "WS";
         return new ParsedWeapon(
             sel.getAttribute("name"),
             intAttr(sel, "number", 1),
             chars.getOrDefault("A", "1"),
-            threshold(bs, 4),
+            threshold(chars.get(bsKey), 4),
             parseint(chars.get("S"), 4),
             parseint(chars.get("AP"), 0),
             chars.getOrDefault("D", "1"),
-            parseKeywords(chars.get("Keywords"))
+            parseKeywords(chars.get("KEYWORDS"))
         );
     }
 
-    // Returns the characteristics of the first profile matching typeName, or null if absent.
+    // -------------------------------------------------------------------------
+    // Profile helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Retourne les caractéristiques du premier profil de type {@code typeName}
+     * qui est enfant DIRECT de sel/profiles (évite les profils des sous-sélections).
+     * Les clés sont normalisées en majuscules pour absorber les variantes BSData/NR.
+     */
     private Map<String, String> profileChars(Element sel, String typeName) {
         Element profiles = child(sel, "profiles");
         if (profiles == null) return null;
@@ -113,13 +158,16 @@ public final class RoszParser {
         Element chars = child(profile, "characteristics");
         if (chars != null) {
             for (Element c : children(chars, "characteristic")) {
-                map.put(c.getAttribute("name"), c.getTextContent().trim());
+                // Normaliser en majuscules pour absorber "Sv"/"SV", "Keywords"/"KEYWORDS", etc.
+                map.put(c.getAttribute("name").toUpperCase(), c.getTextContent().trim());
             }
         }
         return map;
     }
 
-    // --- DOM helpers ---
+    // -------------------------------------------------------------------------
+    // DOM helpers
+    // -------------------------------------------------------------------------
 
     private Element child(Element parent, String tag) {
         NodeList nl = parent.getChildNodes();
@@ -144,9 +192,11 @@ public final class RoszParser {
         return result;
     }
 
-    // --- Value parsers ---
+    // -------------------------------------------------------------------------
+    // Value parsers
+    // -------------------------------------------------------------------------
 
-    /** "3+" → 3, "3+/4++" → 3, "N/A" → fallback */
+    /** "3+" → 3, "3+/4++" → 3, "N/A" ou invalide → fallback */
     private int threshold(String value, int fallback) {
         if (value == null || value.isBlank()) return fallback;
         String digits = value.replaceAll("[^0-9].*", "").trim();
@@ -169,11 +219,13 @@ public final class RoszParser {
         if (value == null || value.isBlank()) return List.of();
         return Arrays.stream(value.split("[,;]"))
             .map(String::trim)
-            .filter(s -> !s.isEmpty())
+            .filter(s -> !s.isEmpty() && !s.equals("-"))
             .toList();
     }
 
-    // --- I/O ---
+    // -------------------------------------------------------------------------
+    // I/O
+    // -------------------------------------------------------------------------
 
     private byte[] extractRos(byte[] zipBytes) throws IOException {
         try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
@@ -192,7 +244,7 @@ public final class RoszParser {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(false);
-            // XXE protection
+            // Protection XXE
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
