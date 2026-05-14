@@ -1,0 +1,108 @@
+<div class="page">
+
+  <mat-card class="form-card">
+    <mat-card-header>
+      <mat-card-title>Paramètres d'attaque</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+
+      <div class="grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Attaques</mat-label>
+          <input matInput type="number" [(ngModel)]="form.attacks" min="0" max="1000">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Touche sur (hit on)</mat-label>
+          <input matInput type="number" [(ngModel)]="form.hitOn" min="2" max="6">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Blesse sur (wound on)</mat-label>
+          <input matInput type="number" [(ngModel)]="form.woundOn" min="2" max="7">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Sauvegarde (save on)</mat-label>
+          <input matInput type="number" [(ngModel)]="form.saveOn" min="2" max="7">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Dégâts</mat-label>
+          <input matInput type="number" [(ngModel)]="form.damage" min="1" max="20">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Seuil critique</mat-label>
+          <input matInput type="number" [(ngModel)]="form.critThreshold" min="2" max="6">
+        </mat-form-field>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <div class="keywords">
+        <span class="keywords-label">Keywords</span>
+
+        <div class="keyword-row">
+          <mat-checkbox [(ngModel)]="form.twinLinked">Twin-Linked</mat-checkbox>
+          <mat-checkbox [(ngModel)]="form.lethalHits">Lethal Hits</mat-checkbox>
+          <mat-checkbox [(ngModel)]="form.devastatingWounds">Devastating Wounds</mat-checkbox>
+        </div>
+
+        <div class="keyword-row">
+          <mat-form-field appearance="outline" class="small">
+            <mat-label>Sustained Hits</mat-label>
+            <input matInput type="number" [(ngModel)]="form.sustainedHits" min="0" max="5">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="small">
+            <mat-label>Anti (cible)</mat-label>
+            <input matInput [(ngModel)]="form.antiTarget" placeholder="ex: INFANTRY">
+          </mat-form-field>
+
+          @if (form.antiTarget) {
+            <mat-form-field appearance="outline" class="small">
+              <mat-label>Anti seuil</mat-label>
+              <input matInput type="number" [(ngModel)]="form.antiThreshold" min="2" max="6">
+            </mat-form-field>
+          }
+        </div>
+      </div>
+
+    </mat-card-content>
+    <mat-card-actions>
+      <button mat-flat-button color="primary" (click)="compute()" [disabled]="loading">
+        {{ loading ? 'Calcul…' : 'Calculer' }}
+      </button>
+    </mat-card-actions>
+  </mat-card>
+
+  @if (error) {
+    <p class="error">{{ error }}</p>
+  }
+
+  @if (result) {
+    <mat-card class="result-card">
+      <mat-card-header>
+        <mat-card-title>Résultats</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+
+        <div class="stats-row">
+          <div class="stat">
+            <span class="stat-value">{{ result.mean | number:'1.2-2' }}</span>
+            <span class="stat-label">Moyenne</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ stdDev | number:'1.2-2' }}</span>
+            <span class="stat-label">Écart-type</span>
+          </div>
+        </div>
+
+        <canvas id="dmgChart"></canvas>
+
+      </mat-card-content>
+    </mat-card>
+  }
+
+</div>

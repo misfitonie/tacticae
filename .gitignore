@@ -15,3 +15,6 @@ Thumbs.db
 # Secrets (on en aura besoin plus tard)
 .env
 *.env
+
+# Claude Code
+.claude/

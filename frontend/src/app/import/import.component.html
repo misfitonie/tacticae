@@ -1,0 +1,68 @@
+<div class="page">
+
+  <mat-card class="drop-card" [class.dragging]="dragging"
+    (dragover)="onDragOver($event)" (dragleave)="onDragLeave()" (drop)="onDrop($event)">
+    <mat-card-content>
+      <div class="drop-zone">
+        <mat-icon class="drop-icon">upload_file</mat-icon>
+        <p>Glissez votre fichier <strong>.rosz</strong> ici</p>
+        <p class="or">— ou —</p>
+        <button mat-stroked-button color="primary" (click)="fileInput.click()" [disabled]="loading">
+          {{ loading ? 'Import en cours…' : 'Choisir un fichier' }}
+        </button>
+        <input #fileInput type="file" accept=".rosz" hidden (change)="onFileChange($event)">
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  @if (error) {
+    <p class="error">{{ error }}</p>
+  }
+
+  @if (army) {
+    <div class="army-header">
+      <h2>{{ army.name }}</h2>
+      <span class="faction">{{ army.factionName }}</span>
+      <span class="unit-count">{{ army.units.length }} unité(s)</span>
+    </div>
+
+    <mat-accordion multi>
+      @for (unit of army.units; track unit.name) {
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>{{ unit.name }}</mat-panel-title>
+            <mat-panel-description>
+              T{{ unit.toughness }} &nbsp;·&nbsp; W{{ unit.wounds }} &nbsp;·&nbsp; Sv{{ unit.save }}+
+            </mat-panel-description>
+          </mat-expansion-panel-header>
+
+          <div class="weapons">
+            @for (w of unit.weapons; track w.name) {
+              <div class="weapon-row">
+                <div class="weapon-info">
+                  <span class="weapon-name">{{ w.name }}</span>
+                  <span class="weapon-stats">
+                    ×{{ w.count }} &nbsp;|&nbsp;
+                    A{{ w.attacks }} &nbsp;BS{{ w.skill }}+ &nbsp;S{{ w.strength }} &nbsp;AP{{ w.ap }} &nbsp;D{{ w.damage }}
+                  </span>
+                  @if (w.keywords.length) {
+                    <div class="chips">
+                      @for (kw of w.keywords; track kw) {
+                        <mat-chip>{{ kw }}</mat-chip>
+                      }
+                    </div>
+                  }
+                </div>
+                <button mat-stroked-button color="accent" (click)="sendToCalc(unit, w)">
+                  Calculer →
+                </button>
+              </div>
+              <mat-divider></mat-divider>
+            }
+          </div>
+        </mat-expansion-panel>
+      }
+    </mat-accordion>
+  }
+
+</div>

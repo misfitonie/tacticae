@@ -1,0 +1,106 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.drop-card {
+  border: 2px dashed #d1d5db;
+  transition: border-color 0.2s, background 0.2s;
+
+  &.dragging {
+    border-color: #6366f1;
+    background: #eef2ff;
+  }
+}
+
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px;
+  gap: 8px;
+  text-align: center;
+  color: rgba(0,0,0,.6);
+}
+
+.drop-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: #6366f1;
+}
+
+.or {
+  font-size: 13px;
+  color: rgba(0,0,0,.4);
+}
+
+.error {
+  color: #c62828;
+  font-size: 14px;
+}
+
+.army-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .faction {
+    color: rgba(0,0,0,.6);
+    font-size: 14px;
+  }
+
+  .unit-count {
+    margin-left: auto;
+    font-size: 13px;
+    color: rgba(0,0,0,.45);
+  }
+}
+
+.weapons {
+  display: flex;
+  flex-direction: column;
+}
+
+.weapon-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.weapon-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.weapon-name {
+  font-weight: 500;
+}
+
+.weapon-stats {
+  font-size: 13px;
+  color: rgba(0,0,0,.6);
+  font-family: monospace;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+mat-chip {
+  font-size: 11px !important;
+  height: 22px !important;
+}
