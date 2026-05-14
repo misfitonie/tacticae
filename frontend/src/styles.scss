@@ -32,7 +32,14 @@ mat-toolbar {
 }
 
 main {
-  max-width: 900px;
+  max-width: 1400px;
   margin: 32px auto;
-  padding: 0 16px;
+  padding: 0 24px;
+}
+
+.tooltip-multiline {
+  white-space: pre-line;
+  max-width: 320px !important;
+  font-size: 0.8rem !important;
+  line-height: 1.5 !important;
 }

@@ -22,6 +22,7 @@ export interface ComputeResponse {
 export interface ParsedWeapon {
   name: string;
   count: number;
+  range: string;   // "Melee" ou portée ex. "24\""
   attacks: string;
   skill: number;
   strength: number;
@@ -36,6 +37,7 @@ export interface ParsedUnit {
   toughness: number;
   wounds: number;
   save: number;
+  invSave: number;  // 7 = aucune save invulnérable
   weapons: ParsedWeapon[];
 }
 

@@ -11,6 +11,8 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -75,10 +77,11 @@ public final class RoszParser {
     }
 
     private ParsedUnit buildUnit(String name, int count, Map<String, String> chars, Element sel) {
-        int t  = parseint(chars.get("T"), 4);
-        int w  = parseint(chars.get("W"), 1);
-        int sv = threshold(chars.get("SV"), 7);  // BSData uses "SV" (caps)
-        return new ParsedUnit(name, count, t, w, sv, List.copyOf(findWeapons(sel)));
+        int t     = parseint(chars.get("T"), 4);
+        int w     = parseint(chars.get("W"), 1);
+        int sv    = threshold(chars.get("SV"), 7);
+        int invSv = parseInvSave(chars);
+        return new ParsedUnit(name, count, t, w, sv, invSv, List.copyOf(findWeapons(sel)));
     }
 
     /** Cherche en profondeur le premier profil Unit d'une sélection. */
@@ -108,22 +111,27 @@ public final class RoszParser {
 
         for (Element c : children(inner, "selection")) {
             Map<String, String> chars = profileChars(c, "Ranged Weapons");
-            if (chars == null) chars = profileChars(c, "Melee Weapons");
             if (chars != null) {
-                weapons.add(buildWeapon(c, chars));
+                weapons.add(buildWeapon(c, chars, false));
             } else {
-                // Pas une arme : descendre (modèles imbriqués, upgrades sans profil d'arme)
-                weapons.addAll(findWeapons(c));
+                chars = profileChars(c, "Melee Weapons");
+                if (chars != null) {
+                    weapons.add(buildWeapon(c, chars, true));
+                } else {
+                    weapons.addAll(findWeapons(c));
+                }
             }
         }
         return weapons;
     }
 
-    private ParsedWeapon buildWeapon(Element sel, Map<String, String> chars) {
-        String bsKey = chars.containsKey("BS") ? "BS" : "WS";
+    private ParsedWeapon buildWeapon(Element sel, Map<String, String> chars, boolean isMelee) {
+        String bsKey = isMelee ? "WS" : "BS";
+        String range = isMelee ? "Melee" : chars.getOrDefault("RANGE", "-");
         return new ParsedWeapon(
             sel.getAttribute("name"),
             intAttr(sel, "number", 1),
+            range,
             chars.getOrDefault("A", "1"),
             threshold(chars.get(bsKey), 4),
             parseint(chars.get("S"), 4),
@@ -221,6 +229,27 @@ public final class RoszParser {
             .map(String::trim)
             .filter(s -> !s.isEmpty() && !s.equals("-"))
             .toList();
+    }
+
+    private static final Pattern INV_PATTERN = Pattern.compile("(\\d+)\\+\\+");
+
+    /** Extrait la save invulnérable (7 = aucune).
+     *  Cherche dans les caractéristiques nommées INV, INVULNERABLE SAVE, etc.
+     *  puis dans le champ SV au format "3+/4++". */
+    private int parseInvSave(Map<String, String> chars) {
+        for (String key : List.of("INV. SV.", "INV SV", "INV", "INVULNERABLE SAVE", "INVULNERABLE")) {
+            String val = chars.get(key);
+            if (val != null && !val.isBlank() && !val.equals("-") && !val.equals("N/A")) {
+                int t = threshold(val, 7);
+                if (t < 7) return t;
+            }
+        }
+        String sv = chars.get("SV");
+        if (sv != null) {
+            Matcher m = INV_PATTERN.matcher(sv);
+            if (m.find()) return Integer.parseInt(m.group(1));
+        }
+        return 7;
     }
 
     // -------------------------------------------------------------------------

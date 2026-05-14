@@ -1,106 +1,448 @@
+// ── Layout ────────────────────────────────────────────────
+
 .page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
 }
 
-.drop-card {
-  border: 2px dashed #d1d5db;
-  transition: border-color 0.2s, background 0.2s;
+.three-col {
+  display: grid;
+  grid-template-columns: 1fr 400px 1fr;
+  gap: 24px;
+  align-items: start;
+}
 
-  &.dragging {
-    border-color: #6366f1;
-    background: #eef2ff;
-  }
+// ── Army panels (left & right) ────────────────────────────
+
+.army-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.faction-name {
+  font-size: 0.8rem;
+  color: #6b7280;
 }
 
 .drop-zone {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32px 16px;
   gap: 8px;
+  padding: 32px 16px;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
   text-align: center;
-  color: rgba(0,0,0,.6);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+
+  &:hover, &.dragging {
+    border-color: #6366f1;
+    background: #eef2ff;
+  }
 }
 
 .drop-icon {
-  font-size: 48px;
-  width: 48px;
-  height: 48px;
-  color: #6366f1;
+  font-size: 36px;
+  width: 36px;
+  height: 36px;
+  color: #9ca3af;
 }
 
-.or {
-  font-size: 13px;
-  color: rgba(0,0,0,.4);
+.drop-label {
+  font-size: 0.85rem;
+  color: #9ca3af;
 }
 
-.error {
-  color: #c62828;
-  font-size: 14px;
-}
-
-.army-header {
+.loading-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
-
-  h2 {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 700;
-  }
-
-  .faction {
-    color: rgba(0,0,0,.6);
-    font-size: 14px;
-  }
-
-  .unit-count {
-    margin-left: auto;
-    font-size: 13px;
-    color: rgba(0,0,0,.45);
-  }
+  color: #6b7280;
+  font-size: 0.9rem;
+  padding: 16px 0;
 }
 
-.weapons {
+.army-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.units-list {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+// ── Unit cards ────────────────────────────────────────────
+
+.unit-card {
+  position: relative;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  &.is-attacker {
+    border-color: #ef4444 !important;
+    background: #fef2f2;
+  }
+
+  &.is-defender {
+    border-color: #3b82f6 !important;
+    background: #eff6ff;
+  }
+
+  mat-card-content {
+    padding: 10px 16px !important;
+  }
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.unit-name {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 4px;
+  flex: 1;
+}
+
+.role-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.icon-attacker { color: #ef4444; }
+.icon-defender { color: #3b82f6; }
+
+.unit-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-qty {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  z-index: 1;
+  background: #6366f1;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px 2px;
+  border-radius: 4px 0 4px 0;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.stat-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #374151;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+
+  &.inv {
+    background: #fef3c7;
+    color: #92400e;
+  }
+}
+
+.weapon-count {
+  margin-left: 4px;
+  font-size: 0.72rem;
+  color: #9ca3af;
+}
+
+// ── Weapons detail (expanded) ─────────────────────────────
+
+.card-weapons {
+  margin-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+  font-size: 0.75rem;
+}
+
+.weapon-group-header {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin: 8px 0 2px;
+
+  &:first-child { margin-top: 4px; }
+}
+
+.weapons-header {
+  display: grid;
+  grid-template-columns: 1fr 48px 28px 28px 42px 28px 28px 28px;
+  gap: 4px;
+  padding: 2px 0 4px;
+  color: #9ca3af;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.65rem;
+}
+
+.col-h {
+  text-align: center;
+
+  &:first-child { text-align: left; }
 }
 
 .weapon-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
-}
-
-.weapon-info {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 28px 28px 42px 28px 28px 28px;
   gap: 4px;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid #f3f4f6;
+
+  &.has-range {
+    grid-template-columns: 1fr 48px 28px 28px 42px 28px 28px 28px;
+  }
+
+  &:last-of-type { border-bottom: none; }
 }
 
-.weapon-name {
+.w-range {
+  font-size: 0.68rem;
+  color: #9ca3af;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.w-name {
+  color: #374151;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.weapon-stats {
-  font-size: 13px;
-  color: rgba(0,0,0,.6);
+.w-val {
+  text-align: center;
+  color: #6b7280;
   font-family: monospace;
 }
 
-.chips {
+.weapon-kws {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
+  gap: 3px;
+  padding: 3px 0 6px;
 }
 
-mat-chip {
-  font-size: 11px !important;
-  height: 22px !important;
+.kw-chip {
+  font-size: 0.65rem;
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+// ── Center panel ──────────────────────────────────────────
+
+.center-panel {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.center-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  border: 2px dashed #e5e7eb;
+  border-radius: 8px;
+  color: #9ca3af;
+  text-align: center;
+
+  p { margin: 0; font-size: 0.9rem; }
+}
+
+.ph-icon {
+  font-size: 40px;
+  opacity: 0.4;
+}
+
+.computing-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  justify-content: center;
+  padding: 32px;
+}
+
+// ── Result card ───────────────────────────────────────────
+
+.result-card {
+  width: 100%;
+}
+
+.matchup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.matchup-unit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+}
+
+.matchup-arrow {
+  color: #9ca3af;
+  font-size: 1rem;
+  padding-left: 4px;
+}
+
+.result-role-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+// ── Pipeline ──────────────────────────────────────────────
+
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 16px 0 8px;
+  padding: 14px 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+  flex: 1;
+
+  &.is-final .step-value { color: #6366f1; }
+  &.is-final .step-label { color: #6366f1; font-weight: 600; }
+}
+
+.step-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.step-label {
+  font-size: 0.65rem;
+  color: #6b7280;
+  text-align: center;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.step-sub {
+  display: block;
+  font-size: 0.63rem;
+  color: #9ca3af;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.pipeline-arrow {
+  color: #d1d5db;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.stddev-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  cursor: default;
+}
+
+.stddev-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #e5e7eb;
+  color: #6b7280;
+  border-radius: 50%;
+  cursor: help;
+}
+
+// ── Misc ──────────────────────────────────────────────────
+
+.selection-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  font-style: italic;
+  text-align: center;
+}
+
+.hint-icon {
+  font-size: 16px;
+  vertical-align: middle;
+}
+
+.error {
+  color: #dc2626;
+  font-size: 0.9rem;
+  text-align: center;
 }

@@ -1,68 +1,315 @@
 <div class="page">
+  <div class="three-col">
 
-  <mat-card class="drop-card" [class.dragging]="dragging"
-    (dragover)="onDragOver($event)" (dragleave)="onDragLeave()" (drop)="onDrop($event)">
-    <mat-card-content>
-      <div class="drop-zone">
-        <mat-icon class="drop-icon">upload_file</mat-icon>
-        <p>Glissez votre fichier <strong>.rosz</strong> ici</p>
-        <p class="or">— ou —</p>
-        <button mat-stroked-button color="primary" (click)="fileInput.click()" [disabled]="loading">
-          {{ loading ? 'Import en cours…' : 'Choisir un fichier' }}
-        </button>
-        <input #fileInput type="file" accept=".rosz" hidden (change)="onFileChange($event)">
+    <!-- ── LEFT : Mon armée ─────────────────────────────── -->
+    <div class="army-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Mon armée</h2>
+        @if (myArmy) {
+          <span class="faction-name">{{ myArmy.factionName }}</span>
+        }
       </div>
-    </mat-card-content>
-  </mat-card>
 
-  @if (error) {
-    <p class="error">{{ error }}</p>
-  }
+      @if (!myArmy && !myLoading) {
+        <div class="drop-zone" [class.dragging]="myDragging"
+          (dragover)="onMyDragOver($event)" (dragleave)="onMyDragLeave()" (drop)="onMyDrop($event)"
+          (click)="fileInputMy.click()">
+          <input #fileInputMy type="file" accept=".rosz" hidden (change)="onMyFileChange($event)">
+          <mat-icon class="drop-icon">upload_file</mat-icon>
+          <span class="drop-label">Glisser un .rosz ou cliquer</span>
+        </div>
+      }
 
-  @if (army) {
-    <div class="army-header">
-      <h2>{{ army.name }}</h2>
-      <span class="faction">{{ army.factionName }}</span>
-      <span class="unit-count">{{ army.units.length }} unité(s)</span>
-    </div>
+      @if (myLoading) {
+        <div class="loading-row">
+          <mat-spinner diameter="32"></mat-spinner>
+          <span>Chargement...</span>
+        </div>
+      }
 
-    <mat-accordion multi>
-      @for (unit of army.units; track unit.name) {
-        <mat-expansion-panel>
-          <mat-expansion-panel-header>
-            <mat-panel-title>{{ unit.name }}</mat-panel-title>
-            <mat-panel-description>
-              T{{ unit.toughness }} &nbsp;·&nbsp; W{{ unit.wounds }} &nbsp;·&nbsp; Sv{{ unit.save }}+
-            </mat-panel-description>
-          </mat-expansion-panel-header>
-
-          <div class="weapons">
-            @for (w of unit.weapons; track w.name) {
-              <div class="weapon-row">
-                <div class="weapon-info">
-                  <span class="weapon-name">{{ w.name }}</span>
-                  <span class="weapon-stats">
-                    ×{{ w.count }} &nbsp;|&nbsp;
-                    A{{ w.attacks }} &nbsp;BS{{ w.skill }}+ &nbsp;S{{ w.strength }} &nbsp;AP{{ w.ap }} &nbsp;D{{ w.damage }}
-                  </span>
-                  @if (w.keywords.length) {
-                    <div class="chips">
-                      @for (kw of w.keywords; track kw) {
-                        <mat-chip>{{ kw }}</mat-chip>
-                      }
-                    </div>
+      @if (myArmy) {
+        <div class="army-actions">
+          <button mat-button (click)="resetMyArmy()">Changer</button>
+        </div>
+        <div class="units-list">
+          @for (entry of myGroups; track entry.unit.name) {
+            <mat-card class="unit-card" appearance="outlined"
+              [class.is-attacker]="selectedAttacker === entry.unit"
+              [class.is-defender]="selectedDefender === entry.unit"
+              (click)="selectUnit(entry.unit)">
+              @if (entry.qty > 1) { <span class="badge-qty">×{{ entry.qty }}</span> }
+              <mat-card-content>
+                <div class="card-row">
+                  <div class="unit-name">{{ entry.unit.name }}</div>
+                  @if (selectedAttacker === entry.unit) {
+                    <span class="material-symbols-outlined role-icon icon-attacker">swords</span>
+                  }
+                  @if (selectedDefender === entry.unit) {
+                    <span class="material-symbols-outlined role-icon icon-defender">shield</span>
                   }
                 </div>
-                <button mat-stroked-button color="accent" (click)="sendToCalc(unit, w)">
-                  Calculer →
-                </button>
-              </div>
-              <mat-divider></mat-divider>
-            }
-          </div>
-        </mat-expansion-panel>
+                <div class="unit-meta">
+                  <span class="stat-badge">T{{ entry.unit.toughness }}</span>
+                  <span class="stat-badge">W{{ entry.unit.wounds }}</span>
+                  <span class="stat-badge">Sv{{ entry.unit.save }}+</span>
+                  @if (entry.unit.invSave < 7) {
+                    <span class="stat-badge inv">{{ entry.unit.invSave }}++</span>
+                  }
+                  <span class="weapon-count">{{ entry.unit.weapons.length }} arme{{ entry.unit.weapons.length > 1 ? 's' : '' }}</span>
+                </div>
+                @if (selectedAttacker === entry.unit || selectedDefender === entry.unit) {
+                  <div class="card-weapons" (click)="$event.stopPropagation()">
+                    @for (group of weaponGroups(entry.unit.weapons); track group.label) {
+                      <div class="weapon-group-header">{{ group.label }}</div>
+                      <div class="weapons-header">
+                        <span class="col-h">Arme</span>
+                        @if (group.label === 'Tir') { <span class="col-h">Portée</span> }
+                        <span class="col-h">×</span>
+                        <span class="col-h">A</span>
+                        <span class="col-h">CC/CT</span>
+                        <span class="col-h">F</span>
+                        <span class="col-h">PA</span>
+                        <span class="col-h">D</span>
+                      </div>
+                      @for (w of group.weapons; track w.name) {
+                        <div class="weapon-row" [class.has-range]="group.label === 'Tir'">
+                          <span class="w-name">{{ w.name }}</span>
+                          @if (group.label === 'Tir') { <span class="w-val w-range">{{ w.range }}</span> }
+                          <span class="w-val">{{ w.count }}</span>
+                          <span class="w-val">{{ w.attacks }}</span>
+                          <span class="w-val">{{ w.skill }}+</span>
+                          <span class="w-val">{{ w.strength }}</span>
+                          <span class="w-val">{{ w.ap }}</span>
+                          <span class="w-val">{{ w.damage }}</span>
+                        </div>
+                        @if (w.keywords.length) {
+                          <div class="weapon-kws">
+                            @for (kw of w.keywords; track kw) {
+                              <span class="kw-chip">{{ kw }}</span>
+                            }
+                          </div>
+                        }
+                      }
+                    }
+                  </div>
+                }
+              </mat-card-content>
+            </mat-card>
+          }
+        </div>
       }
-    </mat-accordion>
-  }
+    </div>
 
+    <!-- ── CENTER : Résultats ────────────────────────────── -->
+    <div class="center-panel">
+
+      @if (error) {
+        <p class="error">{{ error }}</p>
+      }
+
+      @if (!bestWeapon && !computing) {
+        <div class="center-placeholder">
+          @if (!selectedAttacker) {
+            <span class="material-symbols-outlined ph-icon">swords</span>
+            <p>Sélectionne une unité attaquante</p>
+          } @else if (!selectedDefender) {
+            <span class="material-symbols-outlined ph-icon">shield</span>
+            <p>Sélectionne maintenant la cible</p>
+          }
+        </div>
+      }
+
+      @if (computing) {
+        <div class="computing-row">
+          <mat-spinner diameter="28"></mat-spinner>
+          <span>Calcul en cours...</span>
+        </div>
+      }
+
+      @if (bestWeapon && selectedAttacker && selectedDefender && !computing) {
+        <mat-card class="result-card">
+          <mat-card-header>
+            <mat-card-title>
+              <div class="matchup">
+                <span class="matchup-unit">
+                  <span class="material-symbols-outlined result-role-icon icon-attacker">swords</span>
+                  {{ selectedAttacker.name }}
+                </span>
+                <span class="matchup-arrow">↓</span>
+                <span class="matchup-unit">
+                  <span class="material-symbols-outlined result-role-icon icon-defender">shield</span>
+                  {{ selectedDefender.name }}
+                </span>
+              </div>
+            </mat-card-title>
+            <mat-card-subtitle>Meilleure arme : <strong>{{ bestWeapon.weapon.name }}</strong></mat-card-subtitle>
+          </mat-card-header>
+
+          <mat-card-content>
+            @if (breakdown) {
+              <div class="pipeline">
+                <div class="pipeline-step">
+                  <span class="step-value">{{ breakdown.attacks }}</span>
+                  <span class="step-label">Attaques</span>
+                </div>
+                <span class="pipeline-arrow">→</span>
+                <div class="pipeline-step">
+                  <span class="step-value">{{ breakdown.hits | number:'1.1-1' }}</span>
+                  <span class="step-label">Touches <span class="step-sub">({{ breakdown.hitOn }}+)</span></span>
+                </div>
+                <span class="pipeline-arrow">→</span>
+                <div class="pipeline-step">
+                  <span class="step-value">{{ breakdown.wounds | number:'1.1-1' }}</span>
+                  <span class="step-label">Blessures <span class="step-sub">({{ breakdown.woundOn }}+)</span></span>
+                </div>
+                <span class="pipeline-arrow">→</span>
+                <div class="pipeline-step">
+                  <span class="step-value">{{ breakdown.failedSaves | number:'1.1-1' }}</span>
+                  <span class="step-label">
+                    Passent save
+                    <span class="step-sub">
+                      @if (breakdown.saveOn >= 7) { (aucune) } @else { ({{ breakdown.saveOn }}+) }
+                    </span>
+                  </span>
+                </div>
+                <span class="pipeline-arrow">→</span>
+                <div class="pipeline-step is-final">
+                  <span class="step-value">{{ breakdown.damage | number:'1.2-2' }}</span>
+                  <span class="step-label">Dégâts <span class="step-sub">({{ breakdown.failedSaves | number:'1.1-1' }} × {{ breakdown.damageStr }})</span></span>
+                </div>
+              </div>
+
+              <p class="stddev-note"
+                matTooltip="Mesure la dispersion des dégâts autour de la moyenne.&#10;&#10;Écart-type faible → résultats stables et prévisibles.&#10;Écart-type élevé → grande variabilité d'un tour à l'autre.&#10;&#10;Exemple : moyenne 4, écart-type 2 signifie que la plupart des tours se situent entre 2 et 6 dégâts."
+                matTooltipClass="tooltip-multiline"
+                matTooltipPosition="above">
+                Écart-type : ± {{ stdDev | number:'1.2-2' }}
+                <span class="stddev-help">?</span>
+              </p>
+            }
+
+            <canvas id="dmgChart"></canvas>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <!-- Hint de sélection en bas du panneau central -->
+      @if (myArmy || opponentArmy) {
+        <p class="selection-hint">
+          @if (!selectedAttacker && !selectedDefender) {
+            Clique sur une unité pour l'assigner comme attaquante
+            <span class="material-symbols-outlined hint-icon">swords</span>
+          } @else if (selectedAttacker && !selectedDefender) {
+            Clique sur une unité cible
+            <span class="material-symbols-outlined hint-icon">shield</span>
+          } @else if (!selectedAttacker && selectedDefender) {
+            Clique sur l'unité attaquante
+            <span class="material-symbols-outlined hint-icon">swords</span>
+          } @else {
+            Reclique sur une unité sélectionnée pour la désélectionner
+          }
+        </p>
+      }
+    </div>
+
+    <!-- ── RIGHT : Armée adverse ─────────────────────────── -->
+    <div class="army-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Armée adverse</h2>
+        @if (opponentArmy) {
+          <span class="faction-name">{{ opponentArmy.factionName }}</span>
+        }
+      </div>
+
+      @if (!opponentArmy && !opponentLoading) {
+        <div class="drop-zone" [class.dragging]="opponentDragging"
+          (dragover)="onOpponentDragOver($event)" (dragleave)="onOpponentDragLeave()" (drop)="onOpponentDrop($event)"
+          (click)="fileInputOpp.click()">
+          <input #fileInputOpp type="file" accept=".rosz" hidden (change)="onOpponentFileChange($event)">
+          <mat-icon class="drop-icon">upload_file</mat-icon>
+          <span class="drop-label">Glisser un .rosz ou cliquer</span>
+        </div>
+      }
+
+      @if (opponentLoading) {
+        <div class="loading-row">
+          <mat-spinner diameter="32"></mat-spinner>
+          <span>Chargement...</span>
+        </div>
+      }
+
+      @if (opponentArmy) {
+        <div class="army-actions">
+          <button mat-button (click)="resetOpponentArmy()">Changer</button>
+        </div>
+        <div class="units-list">
+          @for (entry of opponentGroups; track entry.unit.name) {
+            <mat-card class="unit-card" appearance="outlined"
+              [class.is-attacker]="selectedAttacker === entry.unit"
+              [class.is-defender]="selectedDefender === entry.unit"
+              (click)="selectUnit(entry.unit)">
+              @if (entry.qty > 1) { <span class="badge-qty">×{{ entry.qty }}</span> }
+              <mat-card-content>
+                <div class="card-row">
+                  <div class="unit-name">{{ entry.unit.name }}</div>
+                  @if (selectedAttacker === entry.unit) {
+                    <span class="material-symbols-outlined role-icon icon-attacker">swords</span>
+                  }
+                  @if (selectedDefender === entry.unit) {
+                    <span class="material-symbols-outlined role-icon icon-defender">shield</span>
+                  }
+                </div>
+                <div class="unit-meta">
+                  <span class="stat-badge">T{{ entry.unit.toughness }}</span>
+                  <span class="stat-badge">W{{ entry.unit.wounds }}</span>
+                  <span class="stat-badge">Sv{{ entry.unit.save }}+</span>
+                  @if (entry.unit.invSave < 7) {
+                    <span class="stat-badge inv">{{ entry.unit.invSave }}++</span>
+                  }
+                  <span class="weapon-count">{{ entry.unit.weapons.length }} arme{{ entry.unit.weapons.length > 1 ? 's' : '' }}</span>
+                </div>
+                @if (selectedAttacker === entry.unit || selectedDefender === entry.unit) {
+                  <div class="card-weapons" (click)="$event.stopPropagation()">
+                    @for (group of weaponGroups(entry.unit.weapons); track group.label) {
+                      <div class="weapon-group-header">{{ group.label }}</div>
+                      <div class="weapons-header">
+                        <span class="col-h">Arme</span>
+                        @if (group.label === 'Tir') { <span class="col-h">Portée</span> }
+                        <span class="col-h">×</span>
+                        <span class="col-h">A</span>
+                        <span class="col-h">CC/CT</span>
+                        <span class="col-h">F</span>
+                        <span class="col-h">PA</span>
+                        <span class="col-h">D</span>
+                      </div>
+                      @for (w of group.weapons; track w.name) {
+                        <div class="weapon-row" [class.has-range]="group.label === 'Tir'">
+                          <span class="w-name">{{ w.name }}</span>
+                          @if (group.label === 'Tir') { <span class="w-val w-range">{{ w.range }}</span> }
+                          <span class="w-val">{{ w.count }}</span>
+                          <span class="w-val">{{ w.attacks }}</span>
+                          <span class="w-val">{{ w.skill }}+</span>
+                          <span class="w-val">{{ w.strength }}</span>
+                          <span class="w-val">{{ w.ap }}</span>
+                          <span class="w-val">{{ w.damage }}</span>
+                        </div>
+                        @if (w.keywords.length) {
+                          <div class="weapon-kws">
+                            @for (kw of w.keywords; track kw) {
+                              <span class="kw-chip">{{ kw }}</span>
+                            }
+                          </div>
+                        }
+                      }
+                    }
+                  </div>
+                }
+              </mat-card-content>
+            </mat-card>
+          }
+        </div>
+      }
+    </div>
+
+  </div>
 </div>
