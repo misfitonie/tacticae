@@ -7,6 +7,7 @@ dependencies {
     implementation(project(":modules:shared"))
     implementation(project(":modules:stats"))
     implementation(project(":modules:reference"))
+    implementation(project(":modules:armies"))
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")

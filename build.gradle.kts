@@ -1,5 +1,8 @@
+import io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension
+
 plugins {
     java
+    id("io.spring.dependency-management") version "1.1.6" apply false
 }
 
 allprojects {
@@ -13,6 +16,13 @@ allprojects {
 
 subprojects {
     apply(plugin = "java")
+    apply(plugin = "io.spring.dependency-management")
+
+    configure<DependencyManagementExtension> {
+        imports {
+            mavenBom("org.springframework.boot:spring-boot-dependencies:3.4.0")
+        }
+    }
 
     java {
         toolchain {
