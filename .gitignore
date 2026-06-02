@@ -18,3 +18,7 @@ Thumbs.db
 
 # Claude Code
 .claude/
+
+# Fichiers de référence locaux (PDFs règles, listes BattleScribe de test)
+*.pdf
+*.rosz
