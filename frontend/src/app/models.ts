@@ -13,6 +13,13 @@ export interface ComputeRequest {
   antiThreshold: number;
   targetWounds: number;
   feelNoPain: number;
+  torrent: boolean;
+  lance: boolean;
+  melta: number;          // 0 = pas de Melta, sinon X (extra damage à demi-portée)
+  cleave: number;         // 0 = pas de Cleave, sinon X (dés par 5 modèles cible)
+  charged: boolean;       // attaquant a chargé ce tour
+  halfRange: boolean;     // cible à demi-portée
+  targetUnitSize: number;
 }
 
 export interface ComputeResponse {

@@ -54,6 +54,9 @@ export class ImportComponent implements OnDestroy {
     'PSYKER', 'FLY', 'CHAOS', 'IMPERIUM',
   ];
 
+  attackerCharged = false;
+  attackerHalfRange = false;
+
   private chart: Chart | null = null;
   private computeToken = 0;
 
@@ -186,6 +189,16 @@ export class ImportComponent implements OnDestroy {
     return this.defenderKeywords.has(kw);
   }
 
+  toggleCharged() {
+    this.attackerCharged = !this.attackerCharged;
+    this.computeIfReady();
+  }
+
+  toggleHalfRange() {
+    this.attackerHalfRange = !this.attackerHalfRange;
+    this.computeIfReady();
+  }
+
   private upload(file: File, target: 'my' | 'opponent') {
     if (!file.name.endsWith('.rosz')) {
       this.error = 'Format non supporté. Importez un fichier .rosz BattleScribe.';
@@ -275,6 +288,13 @@ export class ImportComponent implements OnDestroy {
         antiThreshold: anti?.threshold ?? 4,
         targetWounds: defender.wounds,
         feelNoPain: this.defenderFnp,
+        torrent: kw.some(k => k.includes('torrent')),
+        lance: kw.some(k => k.includes('lance')),
+        melta: this.extractNumberKeyword(kw, 'melta'),
+        cleave: this.extractNumberKeyword(kw, 'cleave'),
+        charged: this.attackerCharged,
+        halfRange: this.attackerHalfRange,
+        targetUnitSize: defender.count,
       };
       return this.stats.compute(req).pipe(map(result => ({ weapon, result }) as WeaponResult));
     });
@@ -303,6 +323,16 @@ export class ImportComponent implements OnDestroy {
   private extractSustained(kw: string[]): number {
     for (const k of kw) {
       const m = k.match(/sustained hits\s*(\d+)/);
+      if (m) return parseInt(m[1]);
+    }
+    return 0;
+  }
+
+  // Extrait "Melta X" ou "Cleave X" → renvoie X, 0 si absent.
+  private extractNumberKeyword(kw: string[], name: string): number {
+    const re = new RegExp(`${name}\\s*(\\d+)`);
+    for (const k of kw) {
+      const m = k.match(re);
       if (m) return parseInt(m[1]);
     }
     return 0;

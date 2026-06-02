@@ -16,26 +16,32 @@ public final class MonteCarloSimulator {
         Map<Integer, Integer> counts = new HashMap<>();
         boolean autoWoundChoice = ctx.shouldAutoWoundOnCrit();
         int effectiveWoundOn = ctx.effectiveWoundOn();
+        int effectiveCritWoundThreshold = ctx.effectiveCritWoundThreshold();
         int fnp = ctx.feelNoPain();
         int targetW = ctx.targetWounds();
+        boolean torrent = ctx.hasTorrent();
 
         for (int t = 0; t < trials; t++) {
-            int attacks = sample(ctx.attacks());
+            int attacks = sample(ctx.effectiveAttacks());
 
             int totalHits = 0;
             int autoWounds = 0;
-            for (int a = 0; a < attacks; a++) {
-                int roll = rng.nextInt(6) + 1;
-                if (roll == 1) continue;
-                if (roll >= ctx.critThreshold()) {
-                    if (autoWoundChoice) {
-                        autoWounds++;
-                    } else {
+            if (torrent) {
+                totalHits = attacks; // auto-hit, no crit
+            } else {
+                for (int a = 0; a < attacks; a++) {
+                    int roll = rng.nextInt(6) + 1;
+                    if (roll == 1) continue;
+                    if (roll >= ctx.critThreshold()) {
+                        if (autoWoundChoice) {
+                            autoWounds++;
+                        } else {
+                            totalHits++;
+                        }
+                        totalHits += ctx.sustainedHitsValue();
+                    } else if (roll >= ctx.hitOn()) {
                         totalHits++;
                     }
-                    totalHits += ctx.sustainedHitsValue();
-                } else if (roll >= ctx.hitOn()) {
-                    totalHits++;
                 }
             }
 
@@ -44,7 +50,7 @@ public final class MonteCarloSimulator {
             for (int h = 0; h < totalHits; h++) {
                 int roll = rollWound(ctx, effectiveWoundOn);
                 if (roll == 0) continue;
-                boolean isCrit = roll >= ctx.critThreshold();
+                boolean isCrit = roll >= effectiveCritWoundThreshold;
                 if (ctx.hasDevastatingWounds() && isCrit) {
                     devastatingCrits++;
                 } else {
@@ -60,11 +66,11 @@ public final class MonteCarloSimulator {
 
             int totalDamage = 0;
             for (int w = 0; w < normalUnsavedWounds; w++) {
-                int d = sample(ctx.damage());
+                int d = sample(ctx.effectiveDamage());
                 totalDamage += applyFnp(d, fnp);
             }
             for (int c = 0; c < devastatingCrits; c++) {
-                int d = Math.min(sample(ctx.damage()), targetW);
+                int d = Math.min(sample(ctx.effectiveDamage()), targetW);
                 totalDamage += applyFnp(d, fnp);
             }
 

@@ -45,6 +45,13 @@ export class CalculatorComponent implements OnInit {
     antiThreshold: 4,
     targetWounds: 1,
     feelNoPain: 0,
+    torrent: false,
+    lance: false,
+    melta: 0,
+    cleave: 0,
+    charged: false,
+    halfRange: false,
+    targetUnitSize: 1,
   };
 
   result: ComputeResponse | null = null;

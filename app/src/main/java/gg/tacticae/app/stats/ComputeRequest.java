@@ -18,5 +18,12 @@ public record ComputeRequest(
     String antiTarget,
     @Min(2) @Max(6)       int antiThreshold,
     Integer targetWounds,
-    Integer feelNoPain
+    Integer feelNoPain,
+    boolean torrent,
+    boolean lance,
+    Integer melta,            // null/0 = pas de Melta, sinon X (extra damage)
+    Integer cleave,           // null/0 = pas de Cleave, sinon X (dés par 5 modèles)
+    boolean charged,          // l'unité attaquante a chargé ce tour
+    boolean halfRange,        // la cible est à demi-portée
+    Integer targetUnitSize    // taille de l'unité cible (pour Cleave)
 ) {}

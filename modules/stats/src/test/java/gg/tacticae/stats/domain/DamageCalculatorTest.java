@@ -520,6 +520,230 @@ class DamageCalculatorTest {
     }
 
     @Nested
+    @DisplayName("V11 — Torrent (auto-hit)")
+    class TorrentV11 {
+
+        @Test
+        @DisplayName("Torrent : chaque attaque touche, pas de jet de hit")
+        void torrentAutoHits() {
+            // hitOn=6, sans Torrent : pHit=1/6. Avec Torrent : pHit=1.
+            // ratio attendu = 6 (compense le hitOn raté autrement).
+            AttackContext baseline = new AttackContext(10, 6, 4, 7, 1, 6, List.of());
+            AttackContext torrent  = new AttackContext(10, 6, 4, 7, 1, 6, "", 1, 0,
+                List.of(new Keyword.Torrent()));
+
+            double ratio = calculator.compute(torrent).mean() / calculator.compute(baseline).mean();
+            assertThat(ratio).isCloseTo(6.0, within(1e-9));
+        }
+
+        @Test
+        @DisplayName("Torrent : SustainedHits ne triggent pas (pas de crit-to-hit)")
+        void torrentDoesNotTriggerSustained() {
+            AttackContext torrent = new AttackContext(10, 4, 4, 7, 1, 6, "", 1, 0,
+                List.of(new Keyword.Torrent(), new Keyword.SustainedHits(3)));
+            AttackContext torrentBare = new AttackContext(10, 4, 4, 7, 1, 6, "", 1, 0,
+                List.of(new Keyword.Torrent()));
+            // SustainedHits 3 sans crit-to-hit → effet nul
+            assertThat(calculator.compute(torrent).mean())
+                .isCloseTo(calculator.compute(torrentBare).mean(), within(1e-9));
+        }
+
+        @Test
+        @DisplayName("Torrent : cross-validation Monte Carlo")
+        void torrentMonteCarlo() {
+            AttackContext ctx = new AttackContext(10, 4, 4, 3, 1, 6, "", 1, 0,
+                List.of(new Keyword.Torrent()));
+            Distribution analytical = calculator.compute(ctx);
+            Distribution mc = new MonteCarloSimulator().simulate(ctx, 500_000);
+            assertThat(analytical.mean()).isCloseTo(mc.mean(), within(0.05));
+        }
+    }
+
+    @Nested
+    @DisplayName("V11 — Lance (+1 wound si charge)")
+    class LanceV11 {
+
+        @Test
+        @DisplayName("Lance + charged : effectiveWoundOn diminue de 1")
+        void chargedLanceImprovesWound() {
+            AttackContext lanceCharged = new AttackContext(
+                Distribution.point(10), 2, 4, 3, Distribution.point(1), 6, "", 1, 0,
+                true, false, 1,
+                List.of(new Keyword.Lance())
+            );
+            assertThat(lanceCharged.effectiveWoundOn()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("Lance sans charge : aucun effet")
+        void unchargedLanceNoEffect() {
+            AttackContext lanceUncharged = new AttackContext(
+                Distribution.point(10), 2, 4, 3, Distribution.point(1), 6, "", 1, 0,
+                false, false, 1,
+                List.of(new Keyword.Lance())
+            );
+            assertThat(lanceUncharged.effectiveWoundOn()).isEqualTo(4);
+        }
+
+        @Test
+        @DisplayName("Lance charged ne descend pas en dessous de 2+")
+        void lanceFloorAtTwoPlus() {
+            AttackContext ctx = new AttackContext(
+                Distribution.point(10), 2, 2, 3, Distribution.point(1), 6, "", 1, 0,
+                true, false, 1,
+                List.of(new Keyword.Lance())
+            );
+            assertThat(ctx.effectiveWoundOn()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Lance charged : cross-validation Monte Carlo")
+        void lanceMonteCarlo() {
+            AttackContext ctx = new AttackContext(
+                Distribution.point(10), 2, 4, 3, Distribution.point(1), 6, "", 1, 0,
+                true, false, 1,
+                List.of(new Keyword.Lance())
+            );
+            Distribution analytical = calculator.compute(ctx);
+            Distribution mc = new MonteCarloSimulator().simulate(ctx, 500_000);
+            assertThat(analytical.mean()).isCloseTo(mc.mean(), within(0.05));
+        }
+    }
+
+    @Nested
+    @DisplayName("V11 — Melta X (+X damage à demi-portée)")
+    class MeltaV11 {
+
+        @Test
+        @DisplayName("Melta 2 + halfRange : damage characteristic +2")
+        void meltaAtHalfRangeAddsDamage() {
+            AttackContext close = new AttackContext(
+                Distribution.point(10), 2, 4, 7, Distribution.point(1), 6, "", 1, 0,
+                false, true, 1,
+                List.of(new Keyword.Melta(2))
+            );
+            AttackContext far = new AttackContext(
+                Distribution.point(10), 2, 4, 7, Distribution.point(1), 6, "", 1, 0,
+                false, false, 1,
+                List.of(new Keyword.Melta(2))
+            );
+            // close : damage = 1+2 = 3. far : damage = 1. ratio = 3
+            double ratio = calculator.compute(close).mean() / calculator.compute(far).mean();
+            assertThat(ratio).isCloseTo(3.0, within(1e-9));
+        }
+
+        @Test
+        @DisplayName("Melta sans halfRange : aucun effet")
+        void meltaWithoutHalfRangeNoEffect() {
+            AttackContext melta = new AttackContext(
+                Distribution.point(10), 2, 4, 7, Distribution.point(1), 6, "", 1, 0,
+                false, false, 1,
+                List.of(new Keyword.Melta(2))
+            );
+            AttackContext baseline = new AttackContext(
+                Distribution.point(10), 2, 4, 7, Distribution.point(1), 6, "", 1, 0,
+                List.of()
+            );
+            assertThat(calculator.compute(melta).mean())
+                .isCloseTo(calculator.compute(baseline).mean(), within(1e-9));
+        }
+
+        @Test
+        @DisplayName("Melta + halfRange : cross-validation Monte Carlo")
+        void meltaMonteCarlo() {
+            AttackContext ctx = new AttackContext(
+                Distribution.point(10), 2, 4, 3, DiceExpression.parse("D6"), 6, "", 1, 0,
+                false, true, 1,
+                List.of(new Keyword.Melta(2))
+            );
+            Distribution analytical = calculator.compute(ctx);
+            Distribution mc = new MonteCarloSimulator().simulate(ctx, 500_000);
+            assertThat(analytical.mean()).isCloseTo(mc.mean(), within(0.1));
+        }
+    }
+
+    @Nested
+    @DisplayName("V11 — Cleave X (dés bonus selon taille cible)")
+    class CleaveV11 {
+
+        @Test
+        @DisplayName("Cleave 1 + targetUnitSize 10 : +2 dés d'attaque")
+        void cleaveAddsExtraAttacks() {
+            AttackContext cleave10 = new AttackContext(
+                Distribution.point(3), 2, 4, 7, Distribution.point(1), 6, "", 1, 0,
+                false, false, 10,
+                List.of(new Keyword.Cleave(1))
+            );
+            AttackContext cleave5 = new AttackContext(
+                Distribution.point(3), 2, 4, 7, Distribution.point(1), 6, "", 1, 0,
+                false, false, 5,
+                List.of(new Keyword.Cleave(1))
+            );
+            // cleave10 : 3 + (10/5)*1 = 5 attaques
+            // cleave5  : 3 + (5/5)*1  = 4 attaques
+            double ratio = calculator.compute(cleave10).mean() / calculator.compute(cleave5).mean();
+            assertThat(ratio).isCloseTo(5.0 / 4.0, within(1e-9));
+        }
+
+        @Test
+        @DisplayName("Cleave 2 + targetUnitSize 8 : +2 dés (8/5 = 1, *2 = 2)")
+        void cleaveTwoAndUnitSizeEight() {
+            AttackContext ctx = new AttackContext(
+                Distribution.point(3), 2, 4, 7, Distribution.point(1), 6, "", 1, 0,
+                false, false, 8,
+                List.of(new Keyword.Cleave(2))
+            );
+            assertThat(ctx.cleaveBonus()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Cleave : cross-validation Monte Carlo")
+        void cleaveMonteCarlo() {
+            AttackContext ctx = new AttackContext(
+                Distribution.point(3), 2, 4, 3, Distribution.point(2), 6, "", 1, 0,
+                false, false, 10,
+                List.of(new Keyword.Cleave(1))
+            );
+            Distribution analytical = calculator.compute(ctx);
+            Distribution mc = new MonteCarloSimulator().simulate(ctx, 500_000);
+            assertThat(analytical.mean()).isCloseTo(mc.mean(), within(0.05));
+        }
+    }
+
+    @Nested
+    @DisplayName("V11 — Anti+DW crit threshold (fix)")
+    class AntiDevastatingFix {
+
+        @Test
+        @DisplayName("Anti-INF 4+ + DW : tous les wounds 4+ deviennent MWs (cap inclus)")
+        void antiLowersCritThresholdForDw() {
+            // Anti-INF 4+ contre INFANTRY : crit wound sur 4+ (au lieu de 6+)
+            // woundOn=5 → effectiveWoundOn=4, effectiveCritWoundThreshold=4
+            // Tous les wounds (3/6) sont des crits → tous DW (cap min(D=1, W=1) = 1)
+            // baseline (sans DW) : 3/6 wounds → save pFailSave=1/6 → 1 dmg
+            AttackContext antiNoDw = new AttackContext(10, 2, 5, 2, 1, 6, "INFANTRY",
+                List.of(new Keyword.AntiKeyword("INFANTRY", 4)));
+            AttackContext antiDw = new AttackContext(10, 2, 5, 2, 1, 6, "INFANTRY",
+                List.of(new Keyword.AntiKeyword("INFANTRY", 4), new Keyword.DevastatingWounds()));
+
+            // antiNoDw : 10 * 5/6 * 3/6 * 1/6 * 1 = 25/108
+            // antiDw   : 10 * 5/6 * 3/6 * 1 = 50/36 (tous bypass save)
+            double ratio = calculator.compute(antiDw).mean() / calculator.compute(antiNoDw).mean();
+            assertThat(ratio).isCloseTo(6.0, within(1e-6));
+        }
+
+        @Test
+        @DisplayName("Anti+DW : cross-validation Monte Carlo")
+        void antiDwMonteCarlo() {
+            AttackContext ctx = new AttackContext(10, 2, 5, 2, 1, 6, "INFANTRY",
+                List.of(new Keyword.AntiKeyword("INFANTRY", 4), new Keyword.DevastatingWounds()));
+            Distribution analytical = calculator.compute(ctx);
+            Distribution mc = new MonteCarloSimulator().simulate(ctx, 500_000);
+            assertThat(analytical.mean()).isCloseTo(mc.mean(), within(0.05));
+        }
+    }
+
+    @Nested
     @DisplayName("V11 — LethalHits choix optionnel")
     class LethalHitsV11 {
 

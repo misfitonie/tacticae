@@ -6,7 +6,7 @@ import java.util.Map;
 public final class DamageCalculator {
 
     public Distribution compute(AttackContext ctx) {
-        return weightedSum(perAttackDamage(ctx), ctx.attacks());
+        return weightedSum(perAttackDamage(ctx), ctx.effectiveAttacks());
     }
 
     // Σ_n P(N = n) · perAttack.power(n) — handles variable attack counts.
@@ -24,6 +24,12 @@ public final class DamageCalculator {
     }
 
     Distribution perAttackDamage(AttackContext ctx) {
+        // TORRENT: every attack auto-hits as a normal hit, no crit, no miss.
+        // SustainedHits/LethalHits don't trigger (they need crit-to-hit).
+        if (ctx.hasTorrent()) {
+            return damageFromHitGoingToWoundRoll(ctx);
+        }
+
         double pMiss = ctx.pMiss();
         double pNormalHit = ctx.pNormalHit();
         double pCritHit = ctx.pCritHit();
@@ -46,7 +52,7 @@ public final class DamageCalculator {
 
     private Distribution damageFromHitGoingToWoundRoll(AttackContext ctx) {
         double pWoundBase = Math.max(0, (7 - ctx.effectiveWoundOn()) / 6.0);
-        double pCritRate = (7 - ctx.critThreshold()) / 6.0;
+        double pCritRate = (7 - ctx.effectiveCritWoundThreshold()) / 6.0;
         double pCritWDie = Math.min(pCritRate, pWoundBase);
         double pNormalWDie = pWoundBase - pCritWDie;
 
@@ -62,7 +68,7 @@ public final class DamageCalculator {
         }
 
         double pFailSave = ctx.pFailSave();
-        Distribution dmgAfterSave = applyFnp(ctx.damage(), ctx);
+        Distribution dmgAfterSave = applyFnp(ctx.effectiveDamage(), ctx);
 
         Map<Integer, Double> result = new HashMap<>();
         double pZero;
@@ -81,7 +87,7 @@ public final class DamageCalculator {
 
     private Distribution damageFromAutoWoundedHit(AttackContext ctx) {
         double pFailSave = ctx.pFailSave();
-        Distribution dmgAfterSave = applyFnp(ctx.damage(), ctx);
+        Distribution dmgAfterSave = applyFnp(ctx.effectiveDamage(), ctx);
 
         Map<Integer, Double> result = new HashMap<>();
         mixIn(result, dmgAfterSave, pFailSave);

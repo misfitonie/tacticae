@@ -36,10 +36,19 @@ public class StatsController {
             keywords.add(new Keyword.DevastatingWounds());
         if (request.antiTarget() != null && !request.antiTarget().isBlank())
             keywords.add(new Keyword.AntiKeyword(request.antiTarget(), request.antiThreshold()));
+        if (request.torrent())
+            keywords.add(new Keyword.Torrent());
+        if (request.lance())
+            keywords.add(new Keyword.Lance());
+        if (request.melta() != null && request.melta() > 0)
+            keywords.add(new Keyword.Melta(request.melta()));
+        if (request.cleave() != null && request.cleave() > 0)
+            keywords.add(new Keyword.Cleave(request.cleave()));
 
         String targetType = request.antiTarget() != null ? request.antiTarget() : "";
         int targetWounds = request.targetWounds() != null ? request.targetWounds() : 1;
         int feelNoPain = request.feelNoPain() != null ? request.feelNoPain() : 0;
+        int targetUnitSize = request.targetUnitSize() != null ? request.targetUnitSize() : 1;
 
         Distribution attacks = DiceExpression.parse(request.attacks());
         Distribution damage = DiceExpression.parse(request.damage());
@@ -54,6 +63,9 @@ public class StatsController {
             targetType,
             targetWounds,
             feelNoPain,
+            request.charged(),
+            request.halfRange(),
+            targetUnitSize,
             keywords
         );
 

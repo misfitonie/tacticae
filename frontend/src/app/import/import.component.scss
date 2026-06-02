@@ -324,6 +324,17 @@
   border: 1px solid #dbeafe;
   border-radius: 8px;
   font-size: 0.78rem;
+
+  &.attacker-mods {
+    background: #fef2f2;
+    border-color: #fecaca;
+
+    .defender-mods-label { color: #ef4444; }
+    .fnp-chip.active {
+      background: #ef4444;
+      border-color: #ef4444;
+    }
+  }
 }
 
 .defender-mods-label {

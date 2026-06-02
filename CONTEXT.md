@@ -55,12 +55,18 @@ Monolithe modulaire — bounded contexts séparés dans un seul deployable.
 ### Keywords implémentés (V11)
 - `SustainedHits(int value)` — un crit to-hit génère 1+value hits
 - `TwinLinked` — relance les wounds ratés (miss only), pWound effective = 2p - p²
-- `AntiKeyword(target, threshold)` — wound sur threshold+ contre target
+- `AntiKeyword(target, threshold)` — V11 : crit wound sur threshold+ contre target
+  (les wounds threshold+ deviennent crits, ce qui matters pour DW)
 - `LethalHits` — **V11 : choix optionnel**. Heuristique : auto-wound sauf si
   DevastatingWounds présent (auquel cas on laisse le wound roll pour préserver
   la chance de crit-to-wound)
 - `DevastatingWounds` — **V11 : crit-to-wound → mortal wounds = min(D, targetWounds)**.
   Le spillover au-delà d'un modèle est perdu (cap par crit). Plus de bypass save AP-infinie.
+- `Torrent` — auto-hit, pas de jet de touche (SustainedHits/LethalHits inactifs)
+- `Lance` — +1 au wound roll si l'attaquant a chargé ce tour (champ AttackContext.charged)
+- `Melta(extraDamage)` — +X damage à demi-portée (champ AttackContext.halfRange)
+- `Cleave(extraDicePerFiveModels)` — dés bonus selon AttackContext.targetUnitSize
+- `Psychic` — marker (les modifs au hit ne sont pas encore modélisés)
 
 ### Mitigateur défenseur
 - `feelNoPain` (champ AttackContext, 0 = aucun, sinon seuil X+) — pour chaque point
@@ -129,12 +135,11 @@ modificateurs de hit.
    À terme, parser les keywords du datasheet pour pré-cocher (et virer la
    sélection manuelle dans la plupart des cas).
 
-### Nouveaux keywords V11 (Phase 1 / 1.5)
-- `[PSYCHIC]` — ignore les modificateurs au hit (sera utile quand on ajoutera les modifs)
-- `[CLEAVE X]` — ajoute des dés selon taille de la cible si mono-cible
-- `[MELTA X]` — +X damage à demi-portée
-- `[LANCE]` — +1 wound si charge ce tour
-- `[TORRENT]` — auto-hit
+### Nouveaux keywords V11 — terminés ✓
+- `[TORRENT]`, `[LANCE]`, `[MELTA X]`, `[CLEAVE X]`, `[PSYCHIC]` (marker)
+- Auto-détectés depuis les keywords d'arme à l'import
+- Toggles UI : "Chargé" (Lance) et "Demi-portée" (Melta) côté attaquant
+- Fix V11 24.03 (Anti) : crit-wound threshold abaissé par Anti (était sous-évalué pour les combos Anti+DW)
 
 ### Infrastructure
 6. **Module `reference`** — modèle de données + seed BSData pour avoir les profils

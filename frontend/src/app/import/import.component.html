@@ -148,6 +148,19 @@
           </div>
         </div>
       }
+      @if (selectedAttacker) {
+        <div class="defender-mods attacker-mods">
+          <span class="defender-mods-label">Modifs attaquant</span>
+          <div class="fnp-chips">
+            <button class="fnp-chip" [class.active]="attackerCharged" (click)="toggleCharged()">
+              Chargé (Lance)
+            </button>
+            <button class="fnp-chip" [class.active]="attackerHalfRange" (click)="toggleHalfRange()">
+              Demi-portée (Melta)
+            </button>
+          </div>
+        </div>
+      }
 
       @if (bestWeapon && selectedAttacker && selectedDefender && !computing) {
         <mat-card class="result-card">
