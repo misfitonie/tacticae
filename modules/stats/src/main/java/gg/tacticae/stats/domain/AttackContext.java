@@ -3,11 +3,11 @@ package gg.tacticae.stats.domain;
 import java.util.List;
 
 public record AttackContext(
-    int attacks,
+    Distribution attacks,
     int hitOn,
     int woundOn,
     int saveOn,
-    int damage,
+    Distribution damage,
     int critThreshold,
     String targetType,
     int targetWounds,
@@ -15,11 +15,11 @@ public record AttackContext(
     List<Keyword> keywords
 ) {
     public AttackContext {
-        if (attacks < 0) throw new IllegalArgumentException("attacks < 0");
+        if (attacks == null) throw new IllegalArgumentException("attacks null");
+        if (damage == null) throw new IllegalArgumentException("damage null");
         if (hitOn < 2 || hitOn > 6) throw new IllegalArgumentException("hitOn out of range");
         if (woundOn < 2 || woundOn > 7) throw new IllegalArgumentException("woundOn out of range");
         if (saveOn < 2 || saveOn > 7) throw new IllegalArgumentException("saveOn out of range");
-        if (damage < 1) throw new IllegalArgumentException("damage < 1");
         if (critThreshold < 2 || critThreshold > 6) throw new IllegalArgumentException("crit out of range");
         if (targetType == null) throw new IllegalArgumentException("targetType null");
         if (targetWounds < 1) throw new IllegalArgumentException("targetWounds < 1");
@@ -27,12 +27,16 @@ public record AttackContext(
         keywords = List.copyOf(keywords);
     }
 
+    public AttackContext(int attacks, int hitOn, int woundOn, int saveOn, int damage, int critThreshold, String targetType, int targetWounds, int feelNoPain, List<Keyword> keywords) {
+        this(Distribution.point(attacks), hitOn, woundOn, saveOn, Distribution.point(damage), critThreshold, targetType, targetWounds, feelNoPain, keywords);
+    }
+
     public AttackContext(int attacks, int hitOn, int woundOn, int saveOn, int damage, int critThreshold, String targetType, List<Keyword> keywords) {
-        this(attacks, hitOn, woundOn, saveOn, damage, critThreshold, targetType, 1, 0, keywords);
+        this(Distribution.point(attacks), hitOn, woundOn, saveOn, Distribution.point(damage), critThreshold, targetType, 1, 0, keywords);
     }
 
     public AttackContext(int attacks, int hitOn, int woundOn, int saveOn, int damage, int critThreshold, List<Keyword> keywords) {
-        this(attacks, hitOn, woundOn, saveOn, damage, critThreshold, "", 1, 0, keywords);
+        this(Distribution.point(attacks), hitOn, woundOn, saveOn, Distribution.point(damage), critThreshold, "", 1, 0, keywords);
     }
 
     public double pMiss() { return (hitOn - 1) / 6.0; }
@@ -81,20 +85,17 @@ public record AttackContext(
         return p;
     }
 
-    // V11: a critical wound from DevastatingWounds inflicts min(D, targetWounds) MWs,
-    // because mortal-wound spillover is now capped at 1 model per critical wound.
-    public int devastatingWoundDamage() {
-        return Math.min(damage, targetWounds);
+    // V11: a critical wound from DevastatingWounds inflicts min(D, targetWounds) MWs.
+    // Applied to each value of the damage distribution.
+    public Distribution devastatingWoundDamage() {
+        final int w = targetWounds;
+        return damage.map(d -> Math.min(d, w));
     }
 
     public boolean hasFeelNoPain() {
         return feelNoPain != 0;
     }
 
-    // V11: LethalHits is now optional. Heuristic: when DevastatingWounds is also
-    // present, we DON'T auto-wound — letting the wound roll happen preserves the
-    // chance of a critical wound (which triggers DW's capped mortal wounds).
-    // Without DW, auto-wound is always strictly better than (or equal to) rolling.
     public boolean shouldAutoWoundOnCrit() {
         return hasLethalHits() && !hasDevastatingWounds();
     }

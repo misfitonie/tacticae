@@ -9,7 +9,7 @@
       <div class="grid">
         <mat-form-field appearance="outline">
           <mat-label>Attaques</mat-label>
-          <input matInput type="number" [(ngModel)]="form.attacks" min="0" max="1000">
+          <input matInput [(ngModel)]="form.attacks" placeholder="ex: 10, D6, 3D6+1">
         </mat-form-field>
 
         <mat-form-field appearance="outline">
@@ -29,7 +29,7 @@
 
         <mat-form-field appearance="outline">
           <mat-label>Dégâts</mat-label>
-          <input matInput type="number" [(ngModel)]="form.damage" min="1" max="20">
+          <input matInput [(ngModel)]="form.damage" placeholder="ex: 2, D6, D3+1">
         </mat-form-field>
 
         <mat-form-field appearance="outline">

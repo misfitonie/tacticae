@@ -31,11 +31,11 @@ export class CalculatorComponent implements OnInit {
   private router = inject(Router);
 
   form: ComputeRequest = {
-    attacks: 10,
+    attacks: '10',
     hitOn: 3,
     woundOn: 4,
     saveOn: 3,
-    damage: 1,
+    damage: '1',
     critThreshold: 6,
     sustainedHits: 0,
     twinLinked: false,

@@ -6,7 +6,21 @@ import java.util.Map;
 public final class DamageCalculator {
 
     public Distribution compute(AttackContext ctx) {
-        return perAttackDamage(ctx).power(ctx.attacks());
+        return weightedSum(perAttackDamage(ctx), ctx.attacks());
+    }
+
+    // Σ_n P(N = n) · perAttack.power(n) — handles variable attack counts.
+    private Distribution weightedSum(Distribution perAttack, Distribution attacksDist) {
+        Map<Integer, Double> result = new HashMap<>();
+        for (var e : attacksDist.pmf().entrySet()) {
+            int n = e.getKey();
+            double weight = e.getValue();
+            Distribution powN = perAttack.power(n);
+            for (var f : powN.pmf().entrySet()) {
+                result.merge(f.getKey(), weight * f.getValue(), Double::sum);
+            }
+        }
+        return Distribution.of(result);
     }
 
     Distribution perAttackDamage(AttackContext ctx) {
@@ -53,8 +67,6 @@ public final class DamageCalculator {
         Map<Integer, Double> result = new HashMap<>();
         double pZero;
         if (ctx.hasDevastatingWounds()) {
-            // V11: a critical wound becomes mortal wounds, capped at min(D, targetWounds)
-            // because spillover beyond one model is lost. No save roll for the crit-wound branch.
             Distribution dmgCritDw = applyFnp(ctx.devastatingWoundDamage(), ctx);
             mixIn(result, dmgCritDw, pCritW);
             mixIn(result, dmgAfterSave, pNormalW * pFailSave);
@@ -84,8 +96,20 @@ public final class DamageCalculator {
         }
     }
 
-    private Distribution applyFnp(int damage, AttackContext ctx) {
-        if (!ctx.hasFeelNoPain() || damage == 0) return Distribution.point(damage);
+    private Distribution applyFnp(Distribution dmgDist, AttackContext ctx) {
+        if (!ctx.hasFeelNoPain()) return dmgDist;
+        Map<Integer, Double> result = new HashMap<>();
+        for (var e : dmgDist.pmf().entrySet()) {
+            Distribution fnp = applyFnpToConstant(e.getKey(), ctx);
+            for (var f : fnp.pmf().entrySet()) {
+                result.merge(f.getKey(), e.getValue() * f.getValue(), Double::sum);
+            }
+        }
+        return Distribution.of(result);
+    }
+
+    private Distribution applyFnpToConstant(int damage, AttackContext ctx) {
+        if (damage == 0) return Distribution.point(0);
         double pTake = (ctx.feelNoPain() - 1) / 6.0;
         double pIgnore = 1 - pTake;
         Map<Integer, Double> pmf = new HashMap<>();

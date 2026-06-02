@@ -418,6 +418,108 @@ class DamageCalculatorTest {
     }
 
     @Nested
+    @DisplayName("V11 — Damage variable (D6, D3, D6+1)")
+    class VariableDamage {
+
+        @Test
+        @DisplayName("damage D6 : moyenne = (moyenne unsaved) * 3.5")
+        void d6DamageMeanScalesByDiceMean() {
+            AttackContext fixedD1 = new AttackContext(
+                Distribution.point(10), 2, 4, 7, Distribution.point(1), 6, "", 1, 0, List.of()
+            );
+            AttackContext d6 = new AttackContext(
+                Distribution.point(10), 2, 4, 7, DiceExpression.parse("D6"), 6, "", 1, 0, List.of()
+            );
+            double ratio = calculator.compute(d6).mean() / calculator.compute(fixedD1).mean();
+            assertThat(ratio).isCloseTo(3.5, within(1e-9));
+        }
+
+        @Test
+        @DisplayName("damage D6+1 : moyenne = (moyenne unsaved) * 4.5")
+        void d6PlusOneDamageMean() {
+            AttackContext fixedD1 = new AttackContext(
+                Distribution.point(10), 2, 4, 7, Distribution.point(1), 6, "", 1, 0, List.of()
+            );
+            AttackContext d6p1 = new AttackContext(
+                Distribution.point(10), 2, 4, 7, DiceExpression.parse("D6+1"), 6, "", 1, 0, List.of()
+            );
+            double ratio = calculator.compute(d6p1).mean() / calculator.compute(fixedD1).mean();
+            assertThat(ratio).isCloseTo(4.5, within(1e-9));
+        }
+
+        @Test
+        @DisplayName("damage D6 vs damage 3 : D6 a même moyenne mais plus de variance")
+        void d6HasMoreVarianceThanFixedEquivalent() {
+            AttackContext d3fixed = new AttackContext(
+                Distribution.point(10), 2, 4, 7, Distribution.point(3), 6, "", 1, 0, List.of()
+            );
+            AttackContext d6 = new AttackContext(
+                Distribution.point(10), 2, 4, 7, DiceExpression.parse("D6"), 6, "", 1, 0, List.of()
+            );
+            // damage D6 : moyenne 3.5 vs 3 → on s'attend à variance plus grande pour D6 (à moyenne ~équivalente)
+            assertThat(calculator.compute(d6).variance())
+                .isGreaterThan(calculator.compute(d3fixed).variance());
+        }
+
+        @Test
+        @DisplayName("damage D6 + DW cap targetWounds=1 : chaque crit ne donne que 1 MW (pas 1..6)")
+        void d6DamageCappedByDw() {
+            // targetWounds=1, damage=D6 : min(D6, 1) = 1 toujours → crit donne 1 MW certain
+            // baseline (sans DW) : chaque wound passe save, damage=D6 (1..6)
+            AttackContext capped = new AttackContext(
+                Distribution.point(10), 2, 6, 3, DiceExpression.parse("D6"), 6, "", 1, 0,
+                List.of(new Keyword.DevastatingWounds())
+            );
+            // moyenne attendue (woundOn=6, critThreshold=6 → tous les wounds sont crits) :
+            //   10 * pHit * pCritW * 1 = 10 * (5/6) * (1/6) * 1 = 50/36 ≈ 1.389
+            assertThat(calculator.compute(capped).mean()).isCloseTo(50.0 / 36, within(1e-9));
+        }
+
+        @Test
+        @DisplayName("damage variable : cross-validation Monte Carlo")
+        void variableDamageMonteCarlo() {
+            AttackContext ctx = new AttackContext(
+                Distribution.point(10), 2, 4, 3, DiceExpression.parse("D6+1"), 6, "", 1, 0, List.of()
+            );
+            Distribution analytical = calculator.compute(ctx);
+            Distribution mc = new MonteCarloSimulator().simulate(ctx, 500_000);
+            assertThat(analytical.mean()).isCloseTo(mc.mean(), within(0.05));
+        }
+    }
+
+    @Nested
+    @DisplayName("V11 — Attacks variable (D6)")
+    class VariableAttacks {
+
+        @Test
+        @DisplayName("attacks D6 : moyenne = (moyenne attacks fixe à 3.5) * autres facteurs")
+        void d6AttacksMean() {
+            AttackContext fixed = new AttackContext(
+                Distribution.point(35), 2, 4, 7, Distribution.point(1), 6, "", 1, 0, List.of()
+            );
+            // 10 armes, chacune D6 attaques → 10 * D6 attaques en moyenne = 35 (mais variance différente)
+            AttackContext d6Atk = new AttackContext(
+                DiceExpression.parse("10D6"), 2, 4, 7, Distribution.point(1), 6, "", 1, 0, List.of()
+            );
+            assertThat(calculator.compute(d6Atk).mean())
+                .isCloseTo(calculator.compute(fixed).mean(), within(1e-9));
+            assertThat(calculator.compute(d6Atk).variance())
+                .isGreaterThan(calculator.compute(fixed).variance());
+        }
+
+        @Test
+        @DisplayName("attacks variable : cross-validation Monte Carlo")
+        void variableAttacksMonteCarlo() {
+            AttackContext ctx = new AttackContext(
+                DiceExpression.parse("3D6"), 2, 4, 3, Distribution.point(1), 6, "", 1, 0, List.of()
+            );
+            Distribution analytical = calculator.compute(ctx);
+            Distribution mc = new MonteCarloSimulator().simulate(ctx, 500_000);
+            assertThat(analytical.mean()).isCloseTo(mc.mean(), within(0.05));
+        }
+    }
+
+    @Nested
     @DisplayName("V11 — LethalHits choix optionnel")
     class LethalHitsV11 {
 

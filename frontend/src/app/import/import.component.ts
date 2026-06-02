@@ -84,12 +84,12 @@ export class ImportComponent implements OnDestroy {
 
   get breakdown(): {
     attacks: number; hits: number; wounds: number; failedSaves: number; damage: number;
-    hitOn: number; woundOn: number; saveOn: number; damageStr: string;
+    hitOn: number; woundOn: number; saveOn: number; damageStr: string; attacksStr: string;
   } | null {
     if (!this.bestWeapon || !this.selectedDefender) return null;
     const w = this.bestWeapon.weapon;
     const def = this.selectedDefender;
-    const attacks = w.count * (parseInt(w.attacks) || 1);
+    const attacks = w.count * this.exprMean(w.attacks);
     const hitOn = w.skill;
     const woundOn = this.woundOn(w.strength, def.toughness);
     const armorSave = Math.min(7, def.save + Math.abs(w.ap));
@@ -101,7 +101,22 @@ export class ImportComponent implements OnDestroy {
     const wounds = hits * pWound;
     const failedSaves = wounds * pFailSave;
     return { attacks, hits, wounds, failedSaves, damage: this.bestWeapon.result.mean,
-             hitOn, woundOn, saveOn, damageStr: w.damage };
+             hitOn, woundOn, saveOn, damageStr: w.damage, attacksStr: this.multiplyExpr(w.attacks, w.count) };
+  }
+
+  private exprMean(expr: string | undefined | null): number {
+    if (!expr) return 1;
+    const e = expr.replace(/\s/g, '').toUpperCase();
+    const dice = e.match(/^(\d+)?D(\d+)(?:\+(\d+))?$/);
+    if (dice) {
+      const k = dice[1] ? parseInt(dice[1]) : 1;
+      const n = parseInt(dice[2]);
+      const mod = dice[3] ? parseInt(dice[3]) : 0;
+      return k * (n + 1) / 2 + mod;
+    }
+    const constant = e.match(/^(\d+)$/);
+    if (constant) return parseInt(e);
+    return 1;
   }
 
   ngOnDestroy() {
@@ -214,11 +229,11 @@ export class ImportComponent implements OnDestroy {
     const requests = attacker.weapons.map(weapon => {
       const kw = weapon.keywords.map(k => k.toLowerCase());
       const req: ComputeRequest = {
-        attacks: weapon.count * (parseInt(weapon.attacks) || 1),
+        attacks: this.multiplyExpr(weapon.attacks, weapon.count),
         hitOn: weapon.skill,
         woundOn: this.woundOn(weapon.strength, defender.toughness),
         saveOn: Math.min(Math.min(7, defender.save + Math.abs(weapon.ap)), defender.invSave ?? 7),
-        damage: parseInt(weapon.damage) || 1,
+        damage: this.normalizeExpr(weapon.damage),
         critThreshold: 6,
         sustainedHits: this.extractSustained(kw),
         twinLinked: kw.some(k => k.includes('twin-linked') || k.includes('twin linked')),
@@ -259,6 +274,35 @@ export class ImportComponent implements OnDestroy {
       if (m) return parseInt(m[1]);
     }
     return 0;
+  }
+
+  // Normalise une expression de dés ("D6", "D6+1", "3", "2D3+1") pour l'API.
+  // Repli sur "1" si non parseable (cas "D6+D3", etc. qu'on ne gère pas encore).
+  private normalizeExpr(expr: string | undefined | null): string {
+    if (!expr) return '1';
+    const e = expr.replace(/\s/g, '').toUpperCase();
+    if (/^(\d+)?D\d+(\+\d+)?$/.test(e) || /^\d+$/.test(e)) return e;
+    return '1';
+  }
+
+  // Multiplie une expression de dés par un scalaire (count d'armes identiques).
+  // "D6" × 3 = "3D6", "D6+1" × 3 = "3D6+3", "5" × 4 = "20".
+  private multiplyExpr(expr: string | undefined | null, count: number): string {
+    const e = this.normalizeExpr(expr);
+    if (count <= 0) return '0';
+    if (count === 1) return e;
+    const dice = e.match(/^(\d+)?D(\d+)(?:\+(\d+))?$/);
+    if (dice) {
+      const k = dice[1] ? parseInt(dice[1]) : 1;
+      const n = parseInt(dice[2]);
+      const mod = dice[3] ? parseInt(dice[3]) : 0;
+      const newK = k * count;
+      const newMod = mod * count;
+      return `${newK}D${n}${newMod > 0 ? '+' + newMod : ''}`;
+    }
+    const constant = e.match(/^(\d+)$/);
+    if (constant) return String(parseInt(e) * count);
+    return e;
   }
 
   private renderChart() {

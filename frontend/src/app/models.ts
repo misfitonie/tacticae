@@ -1,9 +1,9 @@
 export interface ComputeRequest {
-  attacks: number;
+  attacks: string;
   hitOn: number;
   woundOn: number;
   saveOn: number;
-  damage: number;
+  damage: string;
   critThreshold: number;
   sustainedHits: number;
   twinLinked: boolean;

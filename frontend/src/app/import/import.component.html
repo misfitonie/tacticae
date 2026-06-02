@@ -162,8 +162,8 @@
             @if (breakdown) {
               <div class="pipeline">
                 <div class="pipeline-step">
-                  <span class="step-value">{{ breakdown.attacks }}</span>
-                  <span class="step-label">Attaques</span>
+                  <span class="step-value">{{ breakdown.attacks | number:'1.0-1' }}</span>
+                  <span class="step-label">Attaques <span class="step-sub">({{ breakdown.attacksStr }})</span></span>
                 </div>
                 <span class="pipeline-arrow">→</span>
                 <div class="pipeline-step">

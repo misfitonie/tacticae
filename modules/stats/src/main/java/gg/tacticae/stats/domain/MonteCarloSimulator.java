@@ -16,13 +16,15 @@ public final class MonteCarloSimulator {
         Map<Integer, Integer> counts = new HashMap<>();
         boolean autoWoundChoice = ctx.shouldAutoWoundOnCrit();
         int effectiveWoundOn = ctx.effectiveWoundOn();
-        int dwDamage = ctx.devastatingWoundDamage();
         int fnp = ctx.feelNoPain();
+        int targetW = ctx.targetWounds();
 
         for (int t = 0; t < trials; t++) {
+            int attacks = sample(ctx.attacks());
+
             int totalHits = 0;
             int autoWounds = 0;
-            for (int a = 0; a < ctx.attacks(); a++) {
+            for (int a = 0; a < attacks; a++) {
                 int roll = rng.nextInt(6) + 1;
                 if (roll == 1) continue;
                 if (roll >= ctx.critThreshold()) {
@@ -53,35 +55,29 @@ public final class MonteCarloSimulator {
             int normalUnsavedWounds = 0;
             for (int w = 0; w < normalWoundsToSave; w++) {
                 int saveRoll = rng.nextInt(6) + 1;
-                if (saveRoll < ctx.saveOn()) {
-                    normalUnsavedWounds++;
-                }
+                if (saveRoll < ctx.saveOn()) normalUnsavedWounds++;
             }
 
             int totalDamage = 0;
             for (int w = 0; w < normalUnsavedWounds; w++) {
-                totalDamage += applyFnp(ctx.damage(), fnp);
+                int d = sample(ctx.damage());
+                totalDamage += applyFnp(d, fnp);
             }
             for (int c = 0; c < devastatingCrits; c++) {
-                totalDamage += applyFnp(dwDamage, fnp);
+                int d = Math.min(sample(ctx.damage()), targetW);
+                totalDamage += applyFnp(d, fnp);
             }
 
             counts.merge(totalDamage, 1, Integer::sum);
         }
 
         Map<Integer, Double> pmf = new HashMap<>();
-        for (var e : counts.entrySet()) {
-            pmf.put(e.getKey(), e.getValue() / (double) trials);
-        }
+        for (var e : counts.entrySet()) pmf.put(e.getKey(), e.getValue() / (double) trials);
         double sum = pmf.values().stream().mapToDouble(Double::doubleValue).sum();
-        if (Math.abs(sum - 1.0) > 1e-9) {
-            pmf.merge(0, 1.0 - sum, Double::sum);
-        }
+        if (Math.abs(sum - 1.0) > 1e-9) pmf.merge(0, 1.0 - sum, Double::sum);
         return Distribution.of(pmf);
     }
 
-    // Returns the raw wound roll if it succeeds (>= effectiveWoundOn), accounting
-    // for twin-linked rerolls; 0 if both rolls fail.
     private int rollWound(AttackContext ctx, int effectiveWoundOn) {
         int roll = rng.nextInt(6) + 1;
         if (roll >= effectiveWoundOn) return roll;
@@ -98,5 +94,17 @@ public final class MonteCarloSimulator {
             if (roll < fnp) taken++;
         }
         return taken;
+    }
+
+    private int sample(Distribution dist) {
+        double r = rng.nextDouble();
+        double cum = 0;
+        int last = 0;
+        for (var e : dist.pmf().entrySet()) {
+            last = e.getKey();
+            cum += e.getValue();
+            if (r < cum) return e.getKey();
+        }
+        return last;
     }
 }
