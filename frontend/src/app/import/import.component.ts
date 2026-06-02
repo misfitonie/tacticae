@@ -342,22 +342,25 @@ export class ImportComponent implements OnDestroy {
     return 5;
   }
 
+  // V11 24.02 DUPLICATED ABILITIES : si plusieurs instances (ex. Sustained Hits 1
+  // ET 2 sur la même arme), le joueur doit en choisir une. On prend le max,
+  // qui est le choix optimal pour le calcul de dégâts.
   private extractSustained(kw: string[]): number {
-    for (const k of kw) {
-      const m = k.match(/sustained hits\s*(\d+)/);
-      if (m) return parseInt(m[1]);
-    }
-    return 0;
+    return this.maxNumberKeyword(kw, 'sustained hits');
   }
 
-  // Extrait "Melta X" ou "Cleave X" → renvoie X, 0 si absent.
   private extractNumberKeyword(kw: string[], name: string): number {
+    return this.maxNumberKeyword(kw, name);
+  }
+
+  private maxNumberKeyword(kw: string[], name: string): number {
     const re = new RegExp(`${name}\\s*(\\d+)`);
+    let max = 0;
     for (const k of kw) {
       const m = k.match(re);
-      if (m) return parseInt(m[1]);
+      if (m) max = Math.max(max, parseInt(m[1]));
     }
-    return 0;
+    return max;
   }
 
   // Parse les "Anti-X N+" du weapon, garde celui dont X correspond aux types

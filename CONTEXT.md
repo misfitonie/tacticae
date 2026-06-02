@@ -128,16 +128,20 @@ modificateurs de hit.
 
 ## Reste à faire (Phase 1)
 
-### Frontend
-1. **Règle V11 24.02 (DUPLICATED ABILITIES)** — si une arme a plusieurs
-   instances d'un même keyword (Sustained Hits 1 ET 2 par ex.), le joueur
-   choisit. UI à prévoir.
+### Frontend — Phase 1 terminée ✓
+(Toutes les tâches frontend de la Phase 1 sont closes.)
 
-### Nouveaux keywords V11 — terminés ✓
-- `[TORRENT]`, `[LANCE]`, `[MELTA X]`, `[CLEAVE X]`, `[PSYCHIC]` (marker)
-- Auto-détectés depuis les keywords d'arme à l'import
-- Toggles UI : "Chargé" (Lance) et "Demi-portée" (Melta) côté attaquant
-- Fix V11 24.03 (Anti) : crit-wound threshold abaissé par Anti (était sous-évalué pour les combos Anti+DW)
+### Règles V11 — terminées ✓
+- Tous les keywords : SustainedHits, TwinLinked, AntiKeyword, LethalHits,
+  DevastatingWounds, Torrent, Lance, Melta, Cleave, Psychic (marker), FNP
+- Damage et attacks variables (D6, D6+1, 3D6) bout-en-bout
+- Auto-détection depuis weapon.keywords (Torrent/Lance/Melta/Cleave/Anti/Sustained/etc.)
+- Auto-pré-coche des types défenseur depuis ParsedUnit.keywords (.rosz)
+- Toggles UI : FNP, type cible, Chargé, Demi-portée
+- V11 24.02 DUPLICATED ABILITIES : SustainedHits/Melta/Cleave prennent le max
+  des instances (choix optimal), Anti prend le min threshold parmi les types
+  défenseur matching
+- Fix V11 24.03 (Anti) : crit-wound threshold abaissé par Anti
 
 ### Infrastructure
 6. **Module `reference`** — modèle de données + seed BSData pour avoir les profils
