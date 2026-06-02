@@ -44,25 +44,39 @@ Monolithe modulaire — bounded contexts séparés dans un seul deployable.
 ### Classes principales
 - `Distribution` — map {valeur -> probabilité}, immutable, avec convolve/power/map
 - `AttackContext` — paramètres d'une attaque (attacks, hitOn, woundOn, saveOn,
-  damage, critThreshold, List<Keyword>)
-- `DamageCalculator` — pipeline Hit → Wound → Save → Damage
+  damage, critThreshold, targetType, targetWounds, feelNoPain, List<Keyword>)
+- `DamageCalculator` — pipeline **per-attack unifiée** : pour chaque dé d'attaque,
+  on calcule la distribution complète de dégâts (hit → wound → DW/save → FNP),
+  puis `power(attacks)` pour la distribution totale
 - `MonteCarloSimulator` — validateur, cross-check des résultats analytiques
 - `Keyword` — sealed interface avec SustainedHits, TwinLinked, LethalHits,
   DevastatingWounds, AntiKeyword
 
-### Keywords implémentés
+### Keywords implémentés (V11)
 - `SustainedHits(int value)` — un crit to-hit génère 1+value hits
-- `TwinLinked` — relance les wounds ratés, pWound effective = 2p - p²
+- `TwinLinked` — relance les wounds ratés (miss only), pWound effective = 2p - p²
+- `AntiKeyword(target, threshold)` — wound sur threshold+ contre target
+- `LethalHits` — **V11 : choix optionnel**. Heuristique : auto-wound sauf si
+  DevastatingWounds présent (auquel cas on laisse le wound roll pour préserver
+  la chance de crit-to-wound)
+- `DevastatingWounds` — **V11 : crit-to-wound → mortal wounds = min(D, targetWounds)**.
+  Le spillover au-delà d'un modèle est perdu (cap par crit). Plus de bypass save AP-infinie.
 
-### Keywords à implémenter
-- `AntiKeyword(String target, int threshold)` — wound sur threshold+ contre target
-- `LethalHits` — crit to-hit = auto-wound, skip wound phase
-- `DevastatingWounds` — crit to-wound bypass la save (nécessite pipeline multi-canal)
+### Mitigateur défenseur
+- `feelNoPain` (champ AttackContext, 0 = aucun, sinon seuil X+) — pour chaque point
+  de damage, D6, sur X+ la wound est ignorée. Modélisé via Binomial(damage, pTake).
 
 ### Convention critique
-Les crits (to-hit et to-wound) sont toujours sur 6+ naturel en V10,
-indépendamment des modificateurs de hit. Ne pas modifier critThreshold
-sauf si une abilité l'indique explicitement.
+Les crits (to-hit et to-wound) sont sur 6+ naturel par défaut. `critThreshold` est
+configurable (certaines abilités le baissent à 5+), mais reste indépendant des
+modificateurs de hit.
+
+### Choix tactiques non encore optimisés
+- `TwinLinked + DW` : actuellement on ne reroll que sur miss. Idéalement, on
+  rerollerait aussi les normal wounds si MW > damage*pFailSave (à raffiner).
+- `LethalHits + DW` : on choisit globalement (toujours auto-wound ou jamais).
+  Le vrai optimal est par-crit selon le contexte, mais l'heuristique "ne pas
+  auto-wound si DW" est correcte dans la grande majorité des cas.
 
 ## Conventions de code
 - Package racine : `gg.tacticae`
@@ -77,13 +91,14 @@ sauf si une abilité l'indique explicitement.
 
 ### Backend
 - API REST `POST /api/stats/compute` opérationnelle
+  - Accepte `targetWounds` et `feelNoPain` (Integer nullable, defaults 1/0)
 - API REST `POST /api/armies/import` opérationnelle (parse .rosz → JSON)
   - Retourne : `ParsedUnit` (name, count, toughness, wounds, save, invSave, weapons)
   - Retourne : `ParsedWeapon` (name, count, range, attacks, skill, strength, ap, damage, keywords)
   - Détecte la save invulnérable (champs INV, INV. SV., motif `\d++` dans SV)
   - Sépare armes de tir (`range` = portée ex. `"24\""`) et CAC (`range = "Melee"`)
-- Keywords moteur : SustainedHits, TwinLinked implémentés
-- 17+ tests JUnit 5 verts
+- Keywords moteur (V11) : SustainedHits, TwinLinked, LethalHits, DevastatingWounds,
+  AntiKeyword. Mitigateur FeelNoPain. 40 tests JUnit 5 verts (cross-validation Monte Carlo).
 - CI GitHub Actions active sur chaque push main
 - Flyway migration V1 appliquée
 - Docker Compose : `docker compose up` démarre app + postgres
@@ -105,26 +120,31 @@ sauf si une abilité l'indique explicitement.
 
 ## Reste à faire (Phase 1)
 
-### Moteur de calcul (priorité)
-1. **`AntiKeyword(target, threshold)`** — wound sur threshold+ contre une cible typée
-   (ex. Anti-Infantry 4+ = wound sur 4+ contre Infantry)
-2. **`LethalHits`** — crit to-hit = auto-wound, skip wound phase
-3. **`DevastatingWounds`** — crit to-wound bypass la save (pipeline multi-canal,
-   un canal normal + un canal "mortal wounds" convergeant sur la distribution finale)
-
 ### Frontend
-4. **Sélection croisée** — actuellement on ne peut attaquer qu'avec mon armée vs adversaire.
+1. **Sélection croisée** — actuellement on ne peut attaquer qu'avec mon armée vs adversaire.
    Permettre n'importe quelle combinaison (unité adverse peut attaquer mon unité).
-5. **Anti-Target UI** — le champ `antiTarget` du ComputeRequest n'est pas encore
+2. **Anti-Target UI** — le champ `antiTarget` du ComputeRequest n'est pas encore
    alimenté depuis les keywords de l'arme (ex. "Anti-Chaos 2+" → antiTarget="Chaos", threshold=2)
-6. **Dégâts variables** — les weapons avec `attacks` ou `damage` en "D6"/"D3" etc.
+3. **Dégâts variables** — les weapons avec `attacks` ou `damage` en "D6"/"D3" etc.
    ne sont pas encore résolus : `parseInt(weapon.attacks) || 1` retourne 1 pour "D6".
    À traiter côté backend (distribution sur D6) plutôt que frontend.
+4. **targetWounds + feelNoPain** — l'API accepte ces champs, le frontend doit
+   les passer (W du défenseur + FNP si présent sur la datasheet).
+5. **Règle V11 24.02 (DUPLICATED ABILITIES)** — si une arme a plusieurs
+   instances d'un même keyword (Sustained Hits 1 ET 2 par ex.), le joueur
+   choisit. UI à prévoir.
+
+### Nouveaux keywords V11 (Phase 1 / 1.5)
+- `[PSYCHIC]` — ignore les modificateurs au hit (sera utile quand on ajoutera les modifs)
+- `[CLEAVE X]` — ajoute des dés selon taille de la cible si mono-cible
+- `[MELTA X]` — +X damage à demi-portée
+- `[LANCE]` — +1 wound si charge ce tour
+- `[TORRENT]` — auto-hit
 
 ### Infrastructure
-7. **Module `reference`** — modèle de données + seed BSData pour avoir les profils
+6. **Module `reference`** — modèle de données + seed BSData pour avoir les profils
    officiels GW (alternative à l'import BattleScribe)
-8. **Déploiement** — Railway/Fly.io (non commencé)
+7. **Déploiement** — Railway/Fly.io (non commencé)
 
 ## Données de référence
 - Source : BSData GitHub `github.com/BSData/wh40k-10e` (XML, format BattleScribe)

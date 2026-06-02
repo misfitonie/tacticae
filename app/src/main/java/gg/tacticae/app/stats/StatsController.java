@@ -34,6 +34,8 @@ public class StatsController {
             keywords.add(new Keyword.AntiKeyword(request.antiTarget(), request.antiThreshold()));
 
         String targetType = request.antiTarget() != null ? request.antiTarget() : "";
+        int targetWounds = request.targetWounds() != null ? request.targetWounds() : 1;
+        int feelNoPain = request.feelNoPain() != null ? request.feelNoPain() : 0;
 
         AttackContext ctx = new AttackContext(
             request.attacks(),
@@ -43,6 +45,8 @@ public class StatsController {
             request.damage(),
             request.critThreshold(),
             targetType,
+            targetWounds,
+            feelNoPain,
             keywords
         );
 

@@ -6,108 +6,99 @@ import java.util.Map;
 public final class DamageCalculator {
 
     public Distribution compute(AttackContext ctx) {
-        if (ctx.hasLethalHits()) {
-            return computeWithLethalHits(ctx);
-        }
-        Distribution hits = hitPhase(ctx);
-        if (ctx.hasDevastatingWounds()) {
-            return damagePhase(woundAndSaveWithDevastatingWounds(hits, ctx), ctx);
-        }
-        Distribution wounds = woundPhase(hits, ctx);
-        Distribution unsaved = savePhase(wounds, ctx);
-        return damagePhase(unsaved, ctx);
+        return perAttackDamage(ctx).power(ctx.attacks());
     }
 
-    // Crit hits auto-wound, skipping the wound roll.
-    // Each attack die is independent, so we compute the per-die wound distribution
-    // and power it by the number of attacks.
-    private Distribution computeWithLethalHits(AttackContext ctx) {
-        double pWound = ctx.pWoundEffective();
+    Distribution perAttackDamage(AttackContext ctx) {
+        double pMiss = ctx.pMiss();
+        double pNormalHit = ctx.pNormalHit();
+        double pCritHit = ctx.pCritHit();
         int k = ctx.sustainedHitsValue();
 
-        // On a crit: 1 auto-wound + k extra normal hits (from SustainedHits) going through wound roll
-        Distribution extraHitWounds = Distribution.of(Map.of(0, 1 - pWound, 1, pWound)).power(k);
+        Distribution dmgFromWoundRoll = damageFromHitGoingToWoundRoll(ctx);
 
-        Map<Integer, Double> perAttack = new HashMap<>();
-        perAttack.merge(0, ctx.pMiss(), Double::sum);
-        perAttack.merge(0, ctx.pNormalHit() * (1 - pWound), Double::sum);
-        perAttack.merge(1, ctx.pNormalHit() * pWound, Double::sum);
-        for (var e : extraHitWounds.pmf().entrySet()) {
-            perAttack.merge(1 + e.getKey(), ctx.pCritHit() * e.getValue(), Double::sum);
-        }
+        Distribution dmgFromMainCrit = ctx.shouldAutoWoundOnCrit()
+            ? damageFromAutoWoundedHit(ctx)
+            : dmgFromWoundRoll;
+        Distribution dmgFromExtras = dmgFromWoundRoll.power(k);
+        Distribution dmgFromCritHit = dmgFromMainCrit.convolve(dmgFromExtras);
 
-        Distribution totalWounds = Distribution.of(perAttack).power(ctx.attacks());
-        return damagePhase(savePhase(totalWounds, ctx), ctx);
+        Map<Integer, Double> result = new HashMap<>();
+        result.merge(0, pMiss, Double::sum);
+        mixIn(result, dmgFromWoundRoll, pNormalHit);
+        mixIn(result, dmgFromCritHit, pCritHit);
+        return Distribution.of(result);
     }
 
-    // Crit wounds bypass the save entirely; normal wounds still roll.
-    // Combines wound + save into a single per-hit unsaved probability.
-    private Distribution woundAndSaveWithDevastatingWounds(Distribution hits, AttackContext ctx) {
+    private Distribution damageFromHitGoingToWoundRoll(AttackContext ctx) {
         double pWoundBase = Math.max(0, (7 - ctx.effectiveWoundOn()) / 6.0);
-        double pCritW = Math.max(0, Math.min((7 - ctx.critThreshold()) / 6.0, pWoundBase));
-        double pNormalW = pWoundBase - pCritW;
-        double pFailW = 1 - pWoundBase;
+        double pCritRate = (7 - ctx.critThreshold()) / 6.0;
+        double pCritWDie = Math.min(pCritRate, pWoundBase);
+        double pNormalWDie = pWoundBase - pCritWDie;
 
-        double pUnsaved = ctx.hasTwinLinked()
-            ? (1 + pFailW) * (pNormalW * ctx.pFailSave() + pCritW)
-            : pNormalW * ctx.pFailSave() + pCritW;
+        double pCritW;
+        double pNormalW;
+        if (ctx.hasTwinLinked()) {
+            double pMissW = 1 - pWoundBase;
+            pCritW = pCritWDie * (1 + pMissW);
+            pNormalW = pNormalWDie * (1 + pMissW);
+        } else {
+            pCritW = pCritWDie;
+            pNormalW = pNormalWDie;
+        }
 
-        Map<Integer, Double> singleHit = Map.of(0, 1 - pUnsaved, 1, pUnsaved);
-        Distribution unsavedPerHit = Distribution.of(singleHit);
+        double pFailSave = ctx.pFailSave();
+        Distribution dmgAfterSave = applyFnp(ctx.damage(), ctx);
 
         Map<Integer, Double> result = new HashMap<>();
-        for (var e : hits.pmf().entrySet()) {
-            Distribution unsaved = unsavedPerHit.power(e.getKey());
-            for (var u : unsaved.pmf().entrySet()) {
-                result.merge(u.getKey(), e.getValue() * u.getValue(), Double::sum);
-            }
+        double pZero;
+        if (ctx.hasDevastatingWounds()) {
+            // V11: a critical wound becomes mortal wounds, capped at min(D, targetWounds)
+            // because spillover beyond one model is lost. No save roll for the crit-wound branch.
+            Distribution dmgCritDw = applyFnp(ctx.devastatingWoundDamage(), ctx);
+            mixIn(result, dmgCritDw, pCritW);
+            mixIn(result, dmgAfterSave, pNormalW * pFailSave);
+            pZero = 1 - pCritW - pNormalW * pFailSave;
+        } else {
+            mixIn(result, dmgAfterSave, (pCritW + pNormalW) * pFailSave);
+            pZero = 1 - (pCritW + pNormalW) * pFailSave;
         }
+        result.merge(0, pZero, Double::sum);
         return Distribution.of(result);
     }
 
-    Distribution hitPhase(AttackContext ctx) {
-        Map<Integer, Double> single = new HashMap<>();
-        single.merge(0, ctx.pMiss(), Double::sum);
-        single.merge(1, ctx.pNormalHit(), Double::sum);
-        single.merge(1 + ctx.sustainedHitsValue(), ctx.pCritHit(), Double::sum);
-        return Distribution.of(single).power(ctx.attacks());
-    }
-
-    Distribution woundPhase(Distribution hits, AttackContext ctx) {
-        Map<Integer, Double> singleHit = Map.of(
-            0, 1 - ctx.pWoundEffective(),
-            1, ctx.pWoundEffective()
-        );
-        Distribution woundPerHit = Distribution.of(singleHit);
+    private Distribution damageFromAutoWoundedHit(AttackContext ctx) {
+        double pFailSave = ctx.pFailSave();
+        Distribution dmgAfterSave = applyFnp(ctx.damage(), ctx);
 
         Map<Integer, Double> result = new HashMap<>();
-        for (var e : hits.pmf().entrySet()) {
-            Distribution wounds = woundPerHit.power(e.getKey());
-            for (var w : wounds.pmf().entrySet()) {
-                result.merge(w.getKey(), e.getValue() * w.getValue(), Double::sum);
-            }
-        }
+        mixIn(result, dmgAfterSave, pFailSave);
+        result.merge(0, 1 - pFailSave, Double::sum);
         return Distribution.of(result);
     }
 
-    Distribution savePhase(Distribution wounds, AttackContext ctx) {
-        Map<Integer, Double> singleWound = Map.of(
-            0, 1 - ctx.pFailSave(),
-            1, ctx.pFailSave()
-        );
-        Distribution unsavedPerWound = Distribution.of(singleWound);
-
-        Map<Integer, Double> result = new HashMap<>();
-        for (var e : wounds.pmf().entrySet()) {
-            Distribution unsaved = unsavedPerWound.power(e.getKey());
-            for (var u : unsaved.pmf().entrySet()) {
-                result.merge(u.getKey(), e.getValue() * u.getValue(), Double::sum);
-            }
+    private void mixIn(Map<Integer, Double> result, Distribution d, double weight) {
+        if (weight == 0) return;
+        for (var e : d.pmf().entrySet()) {
+            result.merge(e.getKey(), weight * e.getValue(), Double::sum);
         }
-        return Distribution.of(result);
     }
 
-    Distribution damagePhase(Distribution unsaved, AttackContext ctx) {
-        return unsaved.map(n -> n * ctx.damage());
+    private Distribution applyFnp(int damage, AttackContext ctx) {
+        if (!ctx.hasFeelNoPain() || damage == 0) return Distribution.point(damage);
+        double pTake = (ctx.feelNoPain() - 1) / 6.0;
+        double pIgnore = 1 - pTake;
+        Map<Integer, Double> pmf = new HashMap<>();
+        for (int k = 0; k <= damage; k++) {
+            double binom = binomCoef(damage, k) * Math.pow(pTake, k) * Math.pow(pIgnore, damage - k);
+            pmf.merge(k, binom, Double::sum);
+        }
+        return Distribution.of(pmf);
+    }
+
+    private double binomCoef(int n, int k) {
+        double r = 1;
+        for (int i = 0; i < k; i++) r = r * (n - i) / (i + 1);
+        return r;
     }
 }

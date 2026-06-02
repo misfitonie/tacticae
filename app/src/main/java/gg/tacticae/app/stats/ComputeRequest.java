@@ -15,5 +15,7 @@ public record ComputeRequest(
     boolean lethalHits,
     boolean devastatingWounds,
     String antiTarget,
-    @Min(2) @Max(6)    int antiThreshold
+    @Min(2) @Max(6)    int antiThreshold,
+    Integer targetWounds,
+    Integer feelNoPain
 ) {}

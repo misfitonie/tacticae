@@ -329,4 +329,124 @@ class DamageCalculatorTest {
             assertThat(analytical.mean()).isCloseTo(monteCarlo.mean(), within(0.02));
         }
     }
+
+    @Nested
+    @DisplayName("V11 — DevastatingWounds cap par crit")
+    class DevastatingWoundsCapV11 {
+
+        @Test
+        @DisplayName("damage 3 cappé à targetWounds 1 (perte de 2 MW par crit)")
+        void critDamageCappedToTargetWounds() {
+            // damage=3, targetWounds=1 : chaque crit-wound donne min(3,1)=1 MW, 2 sont perdus.
+            // Comparé à un scenario où le cap ne bite pas (damage=1, targetWounds=1) :
+            // les moyennes doivent être identiques (mêmes MWs par crit).
+            AttackContext capped = new AttackContext(10, 2, 4, 3, 3, 6, "", 1, 0,
+                List.of(new Keyword.DevastatingWounds()));
+            AttackContext baseline = new AttackContext(10, 2, 4, 3, 1, 6, "", 1, 0,
+                List.of(new Keyword.DevastatingWounds()));
+
+            // Sur les crits : capped donne 1 MW, baseline donne 1 MW. Mêmes contribs.
+            // Sur les normaux : capped donne 3 dmg, baseline donne 1 dmg.
+            // Donc capped > baseline (à cause des normaux).
+            double meanCapped = calculator.compute(capped).mean();
+            double meanBaseline = calculator.compute(baseline).mean();
+            assertThat(meanCapped).isGreaterThan(meanBaseline);
+        }
+
+        @Test
+        @DisplayName("targetWounds >= damage : cap inopérant, comportement identique au damage non-cappé")
+        void capDoesNotBiteWhenTargetWoundsGteDamage() {
+            // damage=2, targetWounds=2 : cap = min(2,2) = 2, identique à damage normal.
+            // damage=2, targetWounds=5 : cap = min(2,5) = 2, identique aussi.
+            AttackContext w2 = new AttackContext(10, 2, 4, 3, 2, 6, "", 2, 0,
+                List.of(new Keyword.DevastatingWounds()));
+            AttackContext w5 = new AttackContext(10, 2, 4, 3, 2, 6, "", 5, 0,
+                List.of(new Keyword.DevastatingWounds()));
+
+            assertThat(calculator.compute(w2).mean())
+                .isCloseTo(calculator.compute(w5).mean(), within(1e-9));
+        }
+
+        @Test
+        @DisplayName("cap DW : cross-validation Monte Carlo")
+        void cappedDwMonteCarlo() {
+            AttackContext ctx = new AttackContext(10, 2, 4, 3, 3, 6, "", 1, 0,
+                List.of(new Keyword.DevastatingWounds()));
+
+            Distribution analytical = calculator.compute(ctx);
+            Distribution monteCarlo = new MonteCarloSimulator().simulate(ctx, 500_000);
+
+            assertThat(analytical.mean()).isCloseTo(monteCarlo.mean(), within(0.05));
+        }
+    }
+
+    @Nested
+    @DisplayName("V11 — Feel No Pain")
+    class FeelNoPainV11 {
+
+        @Test
+        @DisplayName("FNP 4+ réduit la moyenne d'environ moitié")
+        void fnp4ReducesDamageByHalf() {
+            AttackContext noFnp = new AttackContext(10, 2, 4, 7, 2, 6, "", 1, 0, List.of());
+            AttackContext fnp4 = new AttackContext(10, 2, 4, 7, 2, 6, "", 1, 4, List.of());
+
+            // pTake = 3/6 = 1/2 → moyenne attendue divisée par 2.
+            double ratio = calculator.compute(fnp4).mean() / calculator.compute(noFnp).mean();
+            assertThat(ratio).isCloseTo(0.5, within(1e-9));
+        }
+
+        @Test
+        @DisplayName("FNP 5+ : pTake = 4/6")
+        void fnp5ReducesDamageByFourSixths() {
+            AttackContext noFnp = new AttackContext(10, 2, 4, 7, 3, 6, "", 1, 0, List.of());
+            AttackContext fnp5 = new AttackContext(10, 2, 4, 7, 3, 6, "", 1, 5, List.of());
+
+            double ratio = calculator.compute(fnp5).mean() / calculator.compute(noFnp).mean();
+            assertThat(ratio).isCloseTo(4.0 / 6.0, within(1e-9));
+        }
+
+        @Test
+        @DisplayName("FNP : cross-validation Monte Carlo")
+        void fnpMonteCarlo() {
+            AttackContext ctx = new AttackContext(10, 2, 4, 3, 2, 6, "", 2, 5, List.of());
+
+            Distribution analytical = calculator.compute(ctx);
+            Distribution monteCarlo = new MonteCarloSimulator().simulate(ctx, 500_000);
+
+            assertThat(analytical.mean()).isCloseTo(monteCarlo.mean(), within(0.05));
+        }
+    }
+
+    @Nested
+    @DisplayName("V11 — LethalHits choix optionnel")
+    class LethalHitsV11 {
+
+        @Test
+        @DisplayName("sans DW : auto-wound (shouldAutoWoundOnCrit = true)")
+        void noDevastating_autoWoundOnCrit() {
+            AttackContext ctx = new AttackContext(10, 2, 4, 3, 1, 6, "", 1, 0,
+                List.of(new Keyword.LethalHits()));
+            assertThat(ctx.shouldAutoWoundOnCrit()).isTrue();
+        }
+
+        @Test
+        @DisplayName("avec DW : ne pas auto-wound (laisse le wound roll pour pouvoir crit)")
+        void withDevastating_dontAutoWound() {
+            AttackContext ctx = new AttackContext(10, 2, 4, 3, 1, 6, "", 1, 0,
+                List.of(new Keyword.LethalHits(), new Keyword.DevastatingWounds()));
+            assertThat(ctx.shouldAutoWoundOnCrit()).isFalse();
+        }
+
+        @Test
+        @DisplayName("combo LH + DW : cross-validation Monte Carlo")
+        void lethalDevastatingComboMonteCarlo() {
+            AttackContext ctx = new AttackContext(10, 2, 4, 3, 2, 6, "", 2, 0,
+                List.of(new Keyword.LethalHits(), new Keyword.DevastatingWounds()));
+
+            Distribution analytical = calculator.compute(ctx);
+            Distribution monteCarlo = new MonteCarloSimulator().simulate(ctx, 500_000);
+
+            assertThat(analytical.mean()).isCloseTo(monteCarlo.mean(), within(0.05));
+        }
+    }
 }

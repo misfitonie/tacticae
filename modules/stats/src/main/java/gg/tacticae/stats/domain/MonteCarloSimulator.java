@@ -14,67 +14,89 @@ public final class MonteCarloSimulator {
 
     public Distribution simulate(AttackContext ctx, int trials) {
         Map<Integer, Integer> counts = new HashMap<>();
+        boolean autoWoundChoice = ctx.shouldAutoWoundOnCrit();
+        int effectiveWoundOn = ctx.effectiveWoundOn();
+        int dwDamage = ctx.devastatingWoundDamage();
+        int fnp = ctx.feelNoPain();
 
         for (int t = 0; t < trials; t++) {
             int totalHits = 0;
             int autoWounds = 0;
             for (int a = 0; a < ctx.attacks(); a++) {
                 int roll = rng.nextInt(6) + 1;
-                if (roll == 1) {
-                    continue;
-                }
+                if (roll == 1) continue;
                 if (roll >= ctx.critThreshold()) {
-                    if (ctx.hasLethalHits()) {
-                        autoWounds++; // crit → auto-wound, skips wound roll
+                    if (autoWoundChoice) {
+                        autoWounds++;
                     } else {
                         totalHits++;
                     }
-                    totalHits += ctx.sustainedHitsValue(); // extra hits always roll to wound
+                    totalHits += ctx.sustainedHitsValue();
                 } else if (roll >= ctx.hitOn()) {
-                    totalHits += 1;
+                    totalHits++;
                 }
             }
 
-            int normalWounds = autoWounds;
-            int critWounds = 0;
-            int effectiveWoundOn = ctx.effectiveWoundOn();
+            int normalWoundsToSave = autoWounds;
+            int devastatingCrits = 0;
             for (int h = 0; h < totalHits; h++) {
-                int roll = rng.nextInt(6) + 1;
-                if (ctx.hasDevastatingWounds() && roll >= ctx.critThreshold()) {
-                    critWounds++;
-                } else if (roll >= effectiveWoundOn) {
-                    normalWounds++;
-                } else if (ctx.hasTwinLinked()) {
-                    int reroll = rng.nextInt(6) + 1;
-                    if (ctx.hasDevastatingWounds() && reroll >= ctx.critThreshold()) {
-                        critWounds++;
-                    } else if (reroll >= effectiveWoundOn) {
-                        normalWounds++;
-                    }
+                int roll = rollWound(ctx, effectiveWoundOn);
+                if (roll == 0) continue;
+                boolean isCrit = roll >= ctx.critThreshold();
+                if (ctx.hasDevastatingWounds() && isCrit) {
+                    devastatingCrits++;
+                } else {
+                    normalWoundsToSave++;
                 }
             }
 
-            int unsaved = critWounds; // crit wounds bypass save
-            for (int w = 0; w < normalWounds; w++) {
-                int roll = rng.nextInt(6) + 1;
-                if (roll < ctx.saveOn()) {
-                    unsaved++;
+            int normalUnsavedWounds = 0;
+            for (int w = 0; w < normalWoundsToSave; w++) {
+                int saveRoll = rng.nextInt(6) + 1;
+                if (saveRoll < ctx.saveOn()) {
+                    normalUnsavedWounds++;
                 }
             }
 
-            counts.merge(unsaved * ctx.damage(), 1, Integer::sum);
+            int totalDamage = 0;
+            for (int w = 0; w < normalUnsavedWounds; w++) {
+                totalDamage += applyFnp(ctx.damage(), fnp);
+            }
+            for (int c = 0; c < devastatingCrits; c++) {
+                totalDamage += applyFnp(dwDamage, fnp);
+            }
+
+            counts.merge(totalDamage, 1, Integer::sum);
         }
 
         Map<Integer, Double> pmf = new HashMap<>();
         for (var e : counts.entrySet()) {
             pmf.put(e.getKey(), e.getValue() / (double) trials);
         }
-
         double sum = pmf.values().stream().mapToDouble(Double::doubleValue).sum();
         if (Math.abs(sum - 1.0) > 1e-9) {
             pmf.merge(0, 1.0 - sum, Double::sum);
         }
-
         return Distribution.of(pmf);
+    }
+
+    // Returns the raw wound roll if it succeeds (>= effectiveWoundOn), accounting
+    // for twin-linked rerolls; 0 if both rolls fail.
+    private int rollWound(AttackContext ctx, int effectiveWoundOn) {
+        int roll = rng.nextInt(6) + 1;
+        if (roll >= effectiveWoundOn) return roll;
+        if (!ctx.hasTwinLinked()) return 0;
+        int reroll = rng.nextInt(6) + 1;
+        return reroll >= effectiveWoundOn ? reroll : 0;
+    }
+
+    private int applyFnp(int damage, int fnp) {
+        if (fnp == 0) return damage;
+        int taken = 0;
+        for (int i = 0; i < damage; i++) {
+            int roll = rng.nextInt(6) + 1;
+            if (roll < fnp) taken++;
+        }
+        return taken;
     }
 }
