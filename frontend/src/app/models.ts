@@ -11,6 +11,8 @@ export interface ComputeRequest {
   devastatingWounds: boolean;
   antiTarget: string | null;
   antiThreshold: number;
+  targetWounds: number;
+  feelNoPain: number;
 }
 
 export interface ComputeResponse {

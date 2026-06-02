@@ -45,6 +45,8 @@ export class ImportComponent implements OnDestroy {
   selectedDefender: ParsedUnit | null = null;
   bestWeapon: WeaponResult | null = null;
   computing = false;
+  defenderFnp = 0; // 0 = aucune, sinon seuil X+ (3..6)
+  readonly fnpOptions = [0, 6, 5, 4, 3];
 
   private chart: Chart | null = null;
   private computeToken = 0;
@@ -148,6 +150,11 @@ export class ImportComponent implements OnDestroy {
     this.bestWeapon = null;
   }
 
+  setDefenderFnp(value: number) {
+    this.defenderFnp = value;
+    this.computeIfReady();
+  }
+
   private upload(file: File, target: 'my' | 'opponent') {
     if (!file.name.endsWith('.rosz')) {
       this.error = 'Format non supporté. Importez un fichier .rosz BattleScribe.';
@@ -219,6 +226,8 @@ export class ImportComponent implements OnDestroy {
         devastatingWounds: kw.some(k => k.includes('devastating wounds')),
         antiTarget: null,
         antiThreshold: 4,
+        targetWounds: defender.wounds,
+        feelNoPain: this.defenderFnp,
       };
       return this.stats.compute(req).pipe(map(result => ({ weapon, result }) as WeaponResult));
     });

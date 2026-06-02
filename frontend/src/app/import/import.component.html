@@ -126,6 +126,19 @@
         </div>
       }
 
+      @if (selectedDefender) {
+        <div class="defender-mods">
+          <span class="defender-mods-label">FNP défenseur</span>
+          <div class="fnp-chips">
+            @for (v of fnpOptions; track v) {
+              <button class="fnp-chip" [class.active]="defenderFnp === v" (click)="setDefenderFnp(v)">
+                {{ v === 0 ? 'Aucune' : v + '+' }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
       @if (bestWeapon && selectedAttacker && selectedDefender && !computing) {
         <mat-card class="result-card">
           <mat-card-header>

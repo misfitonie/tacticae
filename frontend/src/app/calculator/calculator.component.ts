@@ -43,6 +43,8 @@ export class CalculatorComponent implements OnInit {
     devastatingWounds: false,
     antiTarget: null,
     antiThreshold: 4,
+    targetWounds: 1,
+    feelNoPain: 0,
   };
 
   result: ComputeResponse | null = null;

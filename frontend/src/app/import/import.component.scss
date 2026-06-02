@@ -313,6 +313,55 @@
   padding: 32px;
 }
 
+// ── Defender modifiers (FNP) ──────────────────────────────
+
+.defender-mods {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+
+.defender-mods-label {
+  color: #3b82f6;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.fnp-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.fnp-chip {
+  font-size: 0.72rem;
+  font-family: monospace;
+  font-weight: 600;
+  background: #ffffff;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  padding: 3px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+  &:hover { background: #f3f4f6; }
+
+  &.active {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #3b82f6;
+  }
+}
+
 // ── Result card ───────────────────────────────────────────
 
 .result-card {
