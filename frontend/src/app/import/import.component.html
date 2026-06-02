@@ -137,6 +137,16 @@
             }
           </div>
         </div>
+        <div class="defender-mods">
+          <span class="defender-mods-label">Type cible (Anti-X)</span>
+          <div class="fnp-chips">
+            @for (kw of keywordOptions; track kw) {
+              <button class="fnp-chip" [class.active]="isDefenderKeywordActive(kw)" (click)="toggleDefenderKeyword(kw)">
+                {{ kw }}
+              </button>
+            }
+          </div>
+        </div>
       }
 
       @if (bestWeapon && selectedAttacker && selectedDefender && !computing) {
@@ -219,7 +229,7 @@
             Clique sur l'unité attaquante
             <span class="material-symbols-outlined hint-icon">swords</span>
           } @else {
-            Reclique sur une unité sélectionnée pour la désélectionner
+            Clique une autre unité pour remplacer (même armée → attaquant, autre → défenseur)
           }
         </p>
       }

@@ -121,18 +121,13 @@ modificateurs de hit.
 ## Reste à faire (Phase 1)
 
 ### Frontend
-1. **Sélection croisée** — actuellement on ne peut attaquer qu'avec mon armée vs adversaire.
-   Permettre n'importe quelle combinaison (unité adverse peut attaquer mon unité).
-2. **Anti-Target UI** — le champ `antiTarget` du ComputeRequest n'est pas encore
-   alimenté depuis les keywords de l'arme (ex. "Anti-Chaos 2+" → antiTarget="Chaos", threshold=2)
-3. **Dégâts variables** — les weapons avec `attacks` ou `damage` en "D6"/"D3" etc.
-   ne sont pas encore résolus : `parseInt(weapon.attacks) || 1` retourne 1 pour "D6".
-   À traiter côté backend (distribution sur D6) plutôt que frontend.
-4. **targetWounds + feelNoPain** — l'API accepte ces champs, le frontend doit
-   les passer (W du défenseur + FNP si présent sur la datasheet).
-5. **Règle V11 24.02 (DUPLICATED ABILITIES)** — si une arme a plusieurs
+1. **Règle V11 24.02 (DUPLICATED ABILITIES)** — si une arme a plusieurs
    instances d'un même keyword (Sustained Hits 1 ET 2 par ex.), le joueur
    choisit. UI à prévoir.
+2. **Parser keywords défenseur depuis .rosz** — actuellement l'utilisateur
+   doit cocher manuellement INFANTRY/VEHICLE/etc. pour que Anti-X s'applique.
+   À terme, parser les keywords du datasheet pour pré-cocher (et virer la
+   sélection manuelle dans la plupart des cas).
 
 ### Nouveaux keywords V11 (Phase 1 / 1.5)
 - `[PSYCHIC]` — ignore les modificateurs au hit (sera utile quand on ajoutera les modifs)

@@ -48,6 +48,12 @@ export class ImportComponent implements OnDestroy {
   defenderFnp = 0; // 0 = aucune, sinon seuil X+ (3..6)
   readonly fnpOptions = [0, 6, 5, 4, 3];
 
+  defenderKeywords = new Set<string>();
+  readonly keywordOptions = [
+    'INFANTRY', 'VEHICLE', 'MONSTER', 'CHARACTER',
+    'PSYKER', 'FLY', 'CHAOS', 'IMPERIUM',
+  ];
+
   private chart: Chart | null = null;
   private computeToken = 0;
 
@@ -170,6 +176,16 @@ export class ImportComponent implements OnDestroy {
     this.computeIfReady();
   }
 
+  toggleDefenderKeyword(kw: string) {
+    if (this.defenderKeywords.has(kw)) this.defenderKeywords.delete(kw);
+    else this.defenderKeywords.add(kw);
+    this.computeIfReady();
+  }
+
+  isDefenderKeywordActive(kw: string): boolean {
+    return this.defenderKeywords.has(kw);
+  }
+
   private upload(file: File, target: 'my' | 'opponent') {
     if (!file.name.endsWith('.rosz')) {
       this.error = 'Format non supporté. Importez un fichier .rosz BattleScribe.';
@@ -204,16 +220,31 @@ export class ImportComponent implements OnDestroy {
     if (this.selectedAttacker === unit) {
       this.selectedAttacker = null;
       this.bestWeapon = null;
-    } else if (this.selectedDefender === unit) {
+      return;
+    }
+    if (this.selectedDefender === unit) {
       this.selectedDefender = null;
       this.bestWeapon = null;
-    } else if (!this.selectedAttacker) {
+      return;
+    }
+    if (!this.selectedAttacker) {
       this.selectedAttacker = unit;
-      this.computeIfReady();
     } else if (!this.selectedDefender) {
       this.selectedDefender = unit;
-      this.computeIfReady();
+    } else {
+      // Both slots filled — replace the one on the same army side as the clicked unit.
+      const clickedSide = this.armyOf(unit);
+      const attackerSide = this.armyOf(this.selectedAttacker);
+      if (clickedSide === attackerSide) this.selectedAttacker = unit;
+      else this.selectedDefender = unit;
     }
+    this.computeIfReady();
+  }
+
+  private armyOf(unit: ParsedUnit): 'my' | 'opponent' | null {
+    if (this.myArmy?.units.includes(unit)) return 'my';
+    if (this.opponentArmy?.units.includes(unit)) return 'opponent';
+    return null;
   }
 
   private computeIfReady() {
@@ -228,6 +259,7 @@ export class ImportComponent implements OnDestroy {
 
     const requests = attacker.weapons.map(weapon => {
       const kw = weapon.keywords.map(k => k.toLowerCase());
+      const anti = this.bestMatchingAnti(weapon.keywords);
       const req: ComputeRequest = {
         attacks: this.multiplyExpr(weapon.attacks, weapon.count),
         hitOn: weapon.skill,
@@ -239,8 +271,8 @@ export class ImportComponent implements OnDestroy {
         twinLinked: kw.some(k => k.includes('twin-linked') || k.includes('twin linked')),
         lethalHits: kw.some(k => k.includes('lethal hits')),
         devastatingWounds: kw.some(k => k.includes('devastating wounds')),
-        antiTarget: null,
-        antiThreshold: 4,
+        antiTarget: anti?.target ?? null,
+        antiThreshold: anti?.threshold ?? 4,
         targetWounds: defender.wounds,
         feelNoPain: this.defenderFnp,
       };
@@ -274,6 +306,22 @@ export class ImportComponent implements OnDestroy {
       if (m) return parseInt(m[1]);
     }
     return 0;
+  }
+
+  // Parse les "Anti-X N+" du weapon, garde celui dont X correspond aux types
+  // sélectionnés sur le défenseur, retourne le meilleur (seuil le plus bas).
+  private bestMatchingAnti(weaponKeywords: string[]): { target: string; threshold: number } | null {
+    if (this.defenderKeywords.size === 0) return null;
+    const matches: { target: string; threshold: number }[] = [];
+    for (const raw of weaponKeywords) {
+      const m = raw.match(/anti[\s-]+([A-Za-z]+)\s*(\d+)\+?/i);
+      if (!m) continue;
+      const target = m[1].toUpperCase();
+      const threshold = parseInt(m[2]);
+      if (this.defenderKeywords.has(target)) matches.push({ target, threshold });
+    }
+    if (matches.length === 0) return null;
+    return matches.reduce((best, curr) => curr.threshold < best.threshold ? curr : best);
   }
 
   // Normalise une expression de dés ("D6", "D6+1", "3", "2D3+1") pour l'API.
