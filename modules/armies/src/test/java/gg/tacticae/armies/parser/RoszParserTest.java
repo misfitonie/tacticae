@@ -62,7 +62,12 @@ class RoszParserTest {
                       </characteristics>
                     </profile>
                   </profiles>
-                  <categories/>
+                  <categories>
+                    <category id="c1" name="Faction: Space Marines" entryId="fc1" primary="true"/>
+                    <category id="c2" name="INFANTRY" entryId="cc1"/>
+                    <category id="c3" name="IMPERIUM" entryId="cc2"/>
+                    <category id="c4" name="Adeptus Astartes" entryId="cc3"/>
+                  </categories>
                   <selections>
                     <selection id="s2" name="Bolt Rifle" entryId="e2" number="10" type="upgrade">
                       <profiles>
@@ -102,6 +107,10 @@ class RoszParserTest {
                 <!-- Unité multi-modèles (pattern Battle Sisters) :
                      profil Unit sur les modèles imbriqués, pas sur l'unité elle-même -->
                 <selection id="s4" name="Devastator Squad" entryId="e4" number="1" type="unit">
+                  <categories>
+                    <category id="c10" name="INFANTRY" entryId="cc10"/>
+                    <category id="c11" name="VEHICLE" entryId="cc11"/>
+                  </categories>
                   <profiles>
                     <profile id="p5" name="Defenders" hidden="false" typeId="t5" typeName="Abilities">
                       <characteristics>
@@ -210,6 +219,15 @@ class RoszParserTest {
             ParsedUnit unit = parser.parse(rosz(SAMPLE_XML)).units().get(0);
             assertThat(unit.weapons()).hasSize(2);
         }
+
+        @Test
+        @DisplayName("extrait les keywords d'unité depuis <categories>")
+        void extractsUnitKeywords() throws IOException {
+            ParsedUnit unit = parser.parse(rosz(SAMPLE_XML)).units().get(0);
+            // INFANTRY, IMPERIUM, ADEPTUS ASTARTES (en majuscules)
+            // "Faction: Space Marines" est exclu
+            assertThat(unit.keywords()).containsExactlyInAnyOrder("INFANTRY", "IMPERIUM", "ADEPTUS ASTARTES");
+        }
     }
 
     @Nested
@@ -237,6 +255,13 @@ class RoszParserTest {
             ParsedUnit unit = parser.parse(rosz(SAMPLE_XML)).units().get(1);
             // Bolt Pistol (depuis Sergeant) + Multi-melta (direct)
             assertThat(unit.weapons()).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("extrait les keywords depuis le niveau unit (pas les modèles)")
+        void extractsKeywordsFromUnitLevel() throws IOException {
+            ParsedUnit unit = parser.parse(rosz(SAMPLE_XML)).units().get(1);
+            assertThat(unit.keywords()).containsExactlyInAnyOrder("INFANTRY", "VEHICLE");
         }
     }
 
@@ -324,6 +349,17 @@ class RoszParserTest {
                 "Battle Sisters Squad",
                 "Retributor Squad"
             );
+        }
+
+        @Test
+        @DisplayName("les unités d'une vraie liste Sororitas portent INFANTRY")
+        void realFileUnitsHaveExpectedKeywords() throws IOException {
+            byte[] roszBytes = readResource("/AoF.rosz");
+            ArmyList army = parser.parse(roszBytes);
+            // Battle Sisters et Retributors sont des unités INFANTRY
+            ParsedUnit sisters = army.units().stream()
+                .filter(u -> u.name().equals("Battle Sisters Squad")).findFirst().orElseThrow();
+            assertThat(sisters.keywords()).contains("INFANTRY");
         }
     }
 

@@ -9,5 +9,6 @@ public record ParsedUnit(
     int wounds,
     int save,
     int invSave,   // 7 = aucune save invulnérable
+    List<String> keywords,
     List<ParsedWeapon> weapons
 ) {}

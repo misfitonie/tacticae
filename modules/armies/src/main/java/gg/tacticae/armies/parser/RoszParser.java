@@ -81,7 +81,26 @@ public final class RoszParser {
         int w     = parseint(chars.get("W"), 1);
         int sv    = threshold(chars.get("SV"), 7);
         int invSv = parseInvSave(chars);
-        return new ParsedUnit(name, count, t, w, sv, invSv, List.copyOf(findWeapons(sel)));
+        return new ParsedUnit(name, count, t, w, sv, invSv,
+            List.copyOf(findCategories(sel)),
+            List.copyOf(findWeapons(sel)));
+    }
+
+    /** Extrait les keywords d'unité depuis &lt;categories&gt; (INFANTRY, VEHICLE, CHAOS...).
+     *  Les tags "Faction: X" sont des étiquettes de catalogue, pas des keywords —
+     *  on les exclut. Tous les noms sont normalisés en majuscules pour matcher
+     *  les Anti-X de façon insensible à la casse. */
+    private List<String> findCategories(Element sel) {
+        Element categories = child(sel, "categories");
+        if (categories == null) return List.of();
+        List<String> result = new ArrayList<>();
+        for (Element cat : children(categories, "category")) {
+            String name = cat.getAttribute("name");
+            if (name == null || name.isBlank()) continue;
+            if (name.startsWith("Faction:")) continue;
+            result.add(name.toUpperCase());
+        }
+        return result;
     }
 
     /** Cherche en profondeur le premier profil Unit d'une sélection. */

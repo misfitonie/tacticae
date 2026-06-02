@@ -99,9 +99,11 @@ modificateurs de hit.
 - API REST `POST /api/stats/compute` opérationnelle
   - Accepte `targetWounds` et `feelNoPain` (Integer nullable, defaults 1/0)
 - API REST `POST /api/armies/import` opérationnelle (parse .rosz → JSON)
-  - Retourne : `ParsedUnit` (name, count, toughness, wounds, save, invSave, weapons)
+  - Retourne : `ParsedUnit` (name, count, toughness, wounds, save, invSave, keywords, weapons)
   - Retourne : `ParsedWeapon` (name, count, range, attacks, skill, strength, ap, damage, keywords)
   - Détecte la save invulnérable (champs INV, INV. SV., motif `\d++` dans SV)
+  - Extrait les keywords d'unité (INFANTRY, VEHICLE, CHAOS...) depuis `<categories>`
+    (tags `Faction: X` filtrés)
   - Sépare armes de tir (`range` = portée ex. `"24\""`) et CAC (`range = "Melee"`)
 - Keywords moteur (V11) : SustainedHits, TwinLinked, LethalHits, DevastatingWounds,
   AntiKeyword. Mitigateur FeelNoPain. 40 tests JUnit 5 verts (cross-validation Monte Carlo).
@@ -130,10 +132,6 @@ modificateurs de hit.
 1. **Règle V11 24.02 (DUPLICATED ABILITIES)** — si une arme a plusieurs
    instances d'un même keyword (Sustained Hits 1 ET 2 par ex.), le joueur
    choisit. UI à prévoir.
-2. **Parser keywords défenseur depuis .rosz** — actuellement l'utilisateur
-   doit cocher manuellement INFANTRY/VEHICLE/etc. pour que Anti-X s'applique.
-   À terme, parser les keywords du datasheet pour pré-cocher (et virer la
-   sélection manuelle dans la plupart des cas).
 
 ### Nouveaux keywords V11 — terminés ✓
 - `[TORRENT]`, `[LANCE]`, `[MELTA X]`, `[CLEAVE X]`, `[PSYCHIC]` (marker)

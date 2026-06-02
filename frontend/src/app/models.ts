@@ -47,6 +47,7 @@ export interface ParsedUnit {
   wounds: number;
   save: number;
   invSave: number;  // 7 = aucune save invulnérable
+  keywords: string[];
   weapons: ParsedWeapon[];
 }
 

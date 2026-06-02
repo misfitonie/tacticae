@@ -49,10 +49,19 @@ export class ImportComponent implements OnDestroy {
   readonly fnpOptions = [0, 6, 5, 4, 3];
 
   defenderKeywords = new Set<string>();
-  readonly keywordOptions = [
+  readonly commonKeywords = [
     'INFANTRY', 'VEHICLE', 'MONSTER', 'CHARACTER',
     'PSYKER', 'FLY', 'CHAOS', 'IMPERIUM',
   ];
+
+  get keywordOptions(): string[] {
+    const all = new Set<string>(this.commonKeywords);
+    for (const k of this.defenderKeywords) all.add(k);
+    if (this.selectedDefender?.keywords) {
+      for (const k of this.selectedDefender.keywords) all.add(k.toUpperCase());
+    }
+    return [...all].sort();
+  }
 
   attackerCharged = false;
   attackerHalfRange = false;
@@ -244,14 +253,27 @@ export class ImportComponent implements OnDestroy {
       this.selectedAttacker = unit;
     } else if (!this.selectedDefender) {
       this.selectedDefender = unit;
+      this.autoPopulateDefenderKeywords(unit);
     } else {
       // Both slots filled — replace the one on the same army side as the clicked unit.
       const clickedSide = this.armyOf(unit);
       const attackerSide = this.armyOf(this.selectedAttacker);
-      if (clickedSide === attackerSide) this.selectedAttacker = unit;
-      else this.selectedDefender = unit;
+      if (clickedSide === attackerSide) {
+        this.selectedAttacker = unit;
+      } else {
+        this.selectedDefender = unit;
+        this.autoPopulateDefenderKeywords(unit);
+      }
     }
     this.computeIfReady();
+  }
+
+  // Coche automatiquement les chips Anti-X correspondant aux keywords du défenseur
+  // depuis le .rosz. L'utilisateur peut toujours surcoucher manuellement.
+  private autoPopulateDefenderKeywords(defender: ParsedUnit) {
+    this.defenderKeywords = new Set(
+      (defender.keywords ?? []).map(k => k.toUpperCase())
+    );
   }
 
   private armyOf(unit: ParsedUnit): 'my' | 'opponent' | null {
