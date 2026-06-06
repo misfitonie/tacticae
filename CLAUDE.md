@@ -18,11 +18,15 @@ Consulte `docs/adr/` pour les décisions architecturales.
 - Les commits suivent la convention : `feat:`, `fix:`, `test:`, `docs:`, `chore:`
 
 ## Prochaines tâches
-1. Keyword `AntiKeyword` dans le moteur de calcul
-2. Keyword `LethalHits`
-3. Keyword `DevastatingWounds` (pipeline multi-canal)
-4. Module `reference` — modèle de données + seed BSData
-5. Module `armies` — parser .rosz BattleScribe
+Le moteur de calcul (tous keywords V11), le parser `.rosz` (`modules/armies`) et le
+frontend Phase 1 sont **terminés**. Voir `CONTEXT.md` § "Reste à faire (Phase 1)".
+
+1. Module `reference` — catalogue BSData. Squelette en place (entités JPA, migration
+   `V2__reference_schema.sql`, repositories), mais **parser + seed + API + page
+   catalogue restent à coder**. Plan détaillé et décisions à trancher : voir la mémoire
+   `reference_module_plan.md`. Démarrer par le MVP (2-3 factions) après avoir tranché
+   la couverture initiale et la version BSData (V10 vs V11) avec Theo.
+2. Déploiement — Railway/Fly.io (non commencé).
 
 ## 1. Think Before Coding
 
